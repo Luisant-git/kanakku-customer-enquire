@@ -55,12 +55,12 @@ const EnquiryForm: React.FC<EnquiryFormProps> = ({ onSubmit }) => {
 
   return (
     <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
-      <div className="bg-gradient-to-r from-indigo-600 to-violet-700 p-8 text-white">
-        <h2 className="text-2xl font-bold">Customer Registration</h2>
+      <div className="bg-gradient-to-r from-indigo-600 to-violet-700 p-4 sm:p-8 text-white">
+        <h2 className="text-2xl font-bold">Rathinavilas</h2>
         <p className="text-indigo-100 text-sm mt-1">Fill out the form below to register.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-8 space-y-6">
+      <form onSubmit={handleSubmit} className="p-4 sm:p-8 space-y-3">
         <div className="space-y-1">
           <label className="text-sm font-semibold text-slate-700 ml-1">Full Name</label>
           <input
