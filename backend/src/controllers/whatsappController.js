@@ -57,18 +57,29 @@ const sendTextMessage = async (to, text) => {
   await sendWhatsAppMessage(to, message);
 };
 
+const sentToday = new Set();
+
 const checkAndSendTemplate = async () => {
   try {
+    const now = new Date();
+    const istTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const currentHour = istTime.getHours();
+    const today = istTime.toISOString().split('T')[0];
+    
+    if (currentHour !== 18) {
+      return;
+    }
+    
     const [rows] = await db.execute(
       'SELECT id, Name, MobileNo FROM customer WHERE Name IS NOT NULL AND MobileNo IS NOT NULL AND DOB IS NULL AND DOA IS NULL AND IsActive = ?',
       ['Y']
     );
 
     for (const customer of rows) {
-      const key = `${customer.MobileNo}_${customer.id}`;
-      if (!processedCustomers.has(key)) {
+      const key = `${customer.MobileNo}_${today}`;
+      if (!sentToday.has(key)) {
         await sendTemplateMessage(customer.MobileNo, '234', '123');
-        processedCustomers.add(key);
+        sentToday.add(key);
         conversationState.set(customer.MobileNo, { step: 'template_sent' });
         console.log(`Template sent to ${customer.MobileNo}`);
       }
@@ -145,33 +156,29 @@ const webhookPost = async (req, res) => {
         const [day, month, year] = userInput.split('-');
         const dbFormat = `${year}-${month}-${day}`;
         await db.execute('UPDATE customer SET DOB = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
-        conversationState.set(dbMobileNo, { step: 'awaiting_doa' });
-        await sendTextMessage(from, 'Please enter your Date of Anniversary (DD-MM-YYYY):');
-      } else {
-        await sendTextMessage(from, 'Invalid format. Please enter Date of Birth in DD-MM-YYYY format:');
       }
+      conversationState.set(dbMobileNo, { step: 'awaiting_doa' });
+      await sendTextMessage(from, 'Please enter your Date of Anniversary (DD-MM-YYYY):');
     } else if (state.step === 'awaiting_doa') {
       const doaRegex = /^\d{2}-\d{2}-\d{4}$/;
       if (doaRegex.test(userInput)) {
         const [day, month, year] = userInput.split('-');
         const dbFormat = `${year}-${month}-${day}`;
         await db.execute('UPDATE customer SET DOA = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
-        conversationState.set(dbMobileNo, { step: 'awaiting_name_confirmation' });
-        await sendTextMessage(from, `Want to update name? Already you have name "${customer.Name}". Is this valid name or if you want to change type "Yes"`);
-      } else {
-        await sendTextMessage(from, 'Invalid format. Please enter Date of Anniversary in DD-MM-YYYY format:');
       }
+      conversationState.set(dbMobileNo, { step: 'awaiting_name_confirmation' });
+      await sendTextMessage(from, `Want to update name? Already you have name "${customer.Name}". Is this valid name or if you want to change type "Yes"`);
     } else if (state.step === 'awaiting_name_confirmation') {
       if (userInput.toLowerCase() === 'yes') {
         conversationState.set(dbMobileNo, { step: 'awaiting_new_name' });
         await sendTextMessage(from, 'Please enter your name:');
       } else {
-        await sendTextMessage(from, 'Thank you! Your information has been saved successfully. 🎉');
+        await sendTextMessage(from, 'நன்றி! உங்கள் தகவல் வெற்றிகரமாக சேமிக்கப்பட்டது. 🎉');
         conversationState.delete(dbMobileNo);
       }
     } else if (state.step === 'awaiting_new_name') {
       await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
-      await sendTextMessage(from, 'Thank you! Your information has been saved successfully. 🎉');
+      await sendTextMessage(from, 'நன்றி! உங்கள் தகவல் வெற்றிகரமாக சேமிக்கப்பட்டது. 🎉');
       conversationState.delete(dbMobileNo);
     }
 
