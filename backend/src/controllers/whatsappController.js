@@ -83,9 +83,13 @@ const webhookVerify = (req, res) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
+  console.log('Webhook verify called:', { mode, token, challenge });
+
   if (mode === 'subscribe' && token === process.env.VERIFY_TOKEN) {
+    console.log('Webhook verified successfully');
     res.status(200).send(challenge);
   } else {
+    console.log('Webhook verification failed');
     res.sendStatus(403);
   }
 };
@@ -111,33 +115,35 @@ const webhookPost = async (req, res) => {
     }
 
     const from = message.from;
+    const mobileNoWithout91 = from.startsWith('91') ? from.substring(2) : from;
     const userInput = message.text.body.trim();
     console.log('From:', from, 'Input:', userInput);
 
     const [rows] = await db.execute(
-      'SELECT id, Name, MobileNo, DOB, DOA FROM customer WHERE MobileNo = ? AND IsActive = ?',
-      [from, 'Y']
+      'SELECT id, Name, MobileNo, DOB, DOA FROM customer WHERE (MobileNo = ? OR MobileNo = ?) AND IsActive = ?',
+      [from, mobileNoWithout91, 'Y']
     );
 
     console.log('Customer found:', rows.length > 0);
     
     if (rows.length === 0) {
-      console.log('No customer found for:', from);
+      console.log('No customer found for:', from, 'or', mobileNoWithout91);
       return res.sendStatus(200);
     }
 
     const customer = rows[0];
-    const state = conversationState.get(from) || { step: 'template_sent' };
+    const dbMobileNo = customer.MobileNo;
+    const state = conversationState.get(dbMobileNo) || { step: 'template_sent' };
     console.log('Current state:', state.step);
 
     if (state.step === 'template_sent') {
-      conversationState.set(from, { step: 'awaiting_dob' });
+      conversationState.set(dbMobileNo, { step: 'awaiting_dob' });
       await sendTextMessage(from, 'Please enter your Date of Birth (YYYY-MM-DD):');
     } else if (state.step === 'awaiting_dob') {
       const dobRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (dobRegex.test(userInput)) {
-        await db.execute('UPDATE customer SET DOB = ? WHERE MobileNo = ?', [userInput, from]);
-        conversationState.set(from, { step: 'awaiting_doa' });
+        await db.execute('UPDATE customer SET DOB = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
+        conversationState.set(dbMobileNo, { step: 'awaiting_doa' });
         await sendTextMessage(from, 'Please enter your Date of Anniversary (YYYY-MM-DD):');
       } else {
         await sendTextMessage(from, 'Invalid format. Please enter Date of Birth in YYYY-MM-DD format:');
@@ -145,24 +151,24 @@ const webhookPost = async (req, res) => {
     } else if (state.step === 'awaiting_doa') {
       const doaRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (doaRegex.test(userInput)) {
-        await db.execute('UPDATE customer SET DOA = ? WHERE MobileNo = ?', [userInput, from]);
-        conversationState.set(from, { step: 'awaiting_name_confirmation' });
+        await db.execute('UPDATE customer SET DOA = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
+        conversationState.set(dbMobileNo, { step: 'awaiting_name_confirmation' });
         await sendTextMessage(from, `Want to update name? Already you have name "${customer.Name}". Is this valid name or if you want to change type "Yes"`);
       } else {
         await sendTextMessage(from, 'Invalid format. Please enter Date of Anniversary in YYYY-MM-DD format:');
       }
     } else if (state.step === 'awaiting_name_confirmation') {
       if (userInput.toLowerCase() === 'yes') {
-        conversationState.set(from, { step: 'awaiting_new_name' });
+        conversationState.set(dbMobileNo, { step: 'awaiting_new_name' });
         await sendTextMessage(from, 'Please enter your name:');
       } else {
         await sendTextMessage(from, 'Thank you! Your information has been saved successfully. 🎉');
-        conversationState.delete(from);
+        conversationState.delete(dbMobileNo);
       }
     } else if (state.step === 'awaiting_new_name') {
-      await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, from]);
+      await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
       await sendTextMessage(from, 'Thank you! Your information has been saved successfully. 🎉');
-      conversationState.delete(from);
+      conversationState.delete(dbMobileNo);
     }
 
     res.sendStatus(200);
