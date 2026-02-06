@@ -6,7 +6,7 @@ const processedCustomers = new Set();
 
 const sendWhatsAppMessage = async (to, message) => {
   try {
-    await axios.post(
+    const response = await axios.post(
       `https://graph.facebook.com/v21.0/${process.env.PHONE_NUMBER_ID}/messages`,
       message,
       {
@@ -16,8 +16,11 @@ const sendWhatsAppMessage = async (to, message) => {
         },
       }
     );
+    console.log('WhatsApp API Response:', JSON.stringify(response.data));
+    return response.data;
   } catch (error) {
-    console.error('Error sending WhatsApp message:', error.response?.data || error.message);
+    console.error('Error sending WhatsApp message:', JSON.stringify(error.response?.data || error.message));
+    throw error;
   }
 };
 
@@ -40,6 +43,7 @@ const sendTemplateMessage = async (to, billNo, amount) => {
       ]
     }
   };
+  console.log('Sending template to:', to, 'Message:', JSON.stringify(message));
   await sendWhatsAppMessage(to, message);
 };
 
