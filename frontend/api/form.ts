@@ -2,15 +2,15 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export interface Customer {
   id?: number;
-  Name: string;
-  MobileNo: string;
+  Name?: string;
+  MobileNo?: string;
   DOB?: string;
   DOA?: string;
   IsActive?: string;
 }
 
 // Create customer
-export const createCustomer = async (customerData: Omit<Customer, 'id'>): Promise<any> => {
+export const createCustomer = async (customerData: Partial<Omit<Customer, 'id'>>): Promise<any> => {
   const response = await fetch(`${API_BASE_URL}/customer`, {
     method: 'POST',
     headers: {

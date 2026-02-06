@@ -4,9 +4,35 @@ const db = require('../config/database');
 const createCustomer = async (req, res) => {
   try {
     const { Name, MobileNo, DOB, DOA } = req.body;
+    
+    const fields = ['IsActive'];
+    const values = ['Y'];
+    const placeholders = ['?'];
+    
+    if (Name) {
+      fields.push('Name');
+      values.push(Name);
+      placeholders.push('?');
+    }
+    if (MobileNo) {
+      fields.push('MobileNo');
+      values.push(MobileNo);
+      placeholders.push('?');
+    }
+    if (DOB) {
+      fields.push('DOB');
+      values.push(DOB);
+      placeholders.push('?');
+    }
+    if (DOA) {
+      fields.push('DOA');
+      values.push(DOA);
+      placeholders.push('?');
+    }
+    
     const [result] = await db.execute(
-      'INSERT INTO customer (Name, MobileNo, DOB, DOA, IsActive) VALUES (?, ?, ?, ?, ?)',
-      [Name, MobileNo, DOB || null, DOA || null, 'Y']
+      `INSERT INTO customer (${fields.join(', ')}) VALUES (${placeholders.join(', ')})`,
+      values
     );
     res.status(201).json({ message: 'Customer created successfully' });
   } catch (error) {

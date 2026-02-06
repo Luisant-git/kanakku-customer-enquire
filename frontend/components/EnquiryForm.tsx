@@ -18,11 +18,8 @@ const EnquiryForm: React.FC<EnquiryFormProps> = ({ onSubmit }) => {
 
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof Customer, string>> = {};
-    if (!formData.Name.trim()) newErrors.Name = 'Name is required';
     
-    if (!formData.MobileNo) {
-      newErrors.MobileNo = 'Mobile number is required';
-    } else if (!/^\d{10}$/.test(formData.MobileNo)) {
+    if (formData.MobileNo && !/^\d{10}$/.test(formData.MobileNo)) {
       newErrors.MobileNo = 'Mobile number must be exactly 10 digits';
     }
     
@@ -36,7 +33,13 @@ const EnquiryForm: React.FC<EnquiryFormProps> = ({ onSubmit }) => {
 
     setIsSubmitting(true);
     try {
-      const result = await createCustomer(formData);
+      const dataToSend: Partial<Customer> = {};
+      if (formData.Name.trim()) dataToSend.Name = formData.Name.trim();
+      if (formData.MobileNo) dataToSend.MobileNo = formData.MobileNo;
+      if (formData.DOB) dataToSend.DOB = formData.DOB;
+      if (formData.DOA) dataToSend.DOA = formData.DOA;
+      
+      const result = await createCustomer(dataToSend);
       onSubmit({ ...formData, id: result.id });
       setFormData({ Name: '', MobileNo: '', DOB: '', DOA: '' });
     } catch (error) {
