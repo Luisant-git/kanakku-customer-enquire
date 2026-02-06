@@ -138,24 +138,28 @@ const webhookPost = async (req, res) => {
 
     if (state.step === 'template_sent') {
       conversationState.set(dbMobileNo, { step: 'awaiting_dob' });
-      await sendTextMessage(from, 'Please enter your Date of Birth (YYYY-MM-DD):');
+      await sendTextMessage(from, 'Please enter your Date of Birth (DD-MM-YYYY):');
     } else if (state.step === 'awaiting_dob') {
-      const dobRegex = /^\d{4}-\d{2}-\d{2}$/;
+      const dobRegex = /^\d{2}-\d{2}-\d{4}$/;
       if (dobRegex.test(userInput)) {
-        await db.execute('UPDATE customer SET DOB = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
+        const [day, month, year] = userInput.split('-');
+        const dbFormat = `${year}-${month}-${day}`;
+        await db.execute('UPDATE customer SET DOB = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
         conversationState.set(dbMobileNo, { step: 'awaiting_doa' });
-        await sendTextMessage(from, 'Please enter your Date of Anniversary (YYYY-MM-DD):');
+        await sendTextMessage(from, 'Please enter your Date of Anniversary (DD-MM-YYYY):');
       } else {
-        await sendTextMessage(from, 'Invalid format. Please enter Date of Birth in YYYY-MM-DD format:');
+        await sendTextMessage(from, 'Invalid format. Please enter Date of Birth in DD-MM-YYYY format:');
       }
     } else if (state.step === 'awaiting_doa') {
-      const doaRegex = /^\d{4}-\d{2}-\d{2}$/;
+      const doaRegex = /^\d{2}-\d{2}-\d{4}$/;
       if (doaRegex.test(userInput)) {
-        await db.execute('UPDATE customer SET DOA = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
+        const [day, month, year] = userInput.split('-');
+        const dbFormat = `${year}-${month}-${day}`;
+        await db.execute('UPDATE customer SET DOA = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
         conversationState.set(dbMobileNo, { step: 'awaiting_name_confirmation' });
         await sendTextMessage(from, `Want to update name? Already you have name "${customer.Name}". Is this valid name or if you want to change type "Yes"`);
       } else {
-        await sendTextMessage(from, 'Invalid format. Please enter Date of Anniversary in YYYY-MM-DD format:');
+        await sendTextMessage(from, 'Invalid format. Please enter Date of Anniversary in DD-MM-YYYY format:');
       }
     } else if (state.step === 'awaiting_name_confirmation') {
       if (userInput.toLowerCase() === 'yes') {
