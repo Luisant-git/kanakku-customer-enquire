@@ -92,28 +92,43 @@ const webhookVerify = (req, res) => {
 
 const webhookPost = async (req, res) => {
   try {
+    console.log('Webhook received:', JSON.stringify(req.body));
+    
     const entry = req.body.entry?.[0];
     const change = entry?.changes?.[0];
     const message = change?.value?.messages?.[0];
 
-    if (!message || message.type !== 'text') {
+    if (!message) {
+      console.log('No message found');
+      return res.sendStatus(200);
+    }
+
+    console.log('Message type:', message.type);
+    
+    if (message.type !== 'text') {
+      console.log('Not a text message, ignoring');
       return res.sendStatus(200);
     }
 
     const from = message.from;
     const userInput = message.text.body.trim();
+    console.log('From:', from, 'Input:', userInput);
 
     const [rows] = await db.execute(
       'SELECT id, Name, MobileNo, DOB, DOA FROM customer WHERE MobileNo = ? AND IsActive = ?',
       [from, 'Y']
     );
 
+    console.log('Customer found:', rows.length > 0);
+    
     if (rows.length === 0) {
+      console.log('No customer found for:', from);
       return res.sendStatus(200);
     }
 
     const customer = rows[0];
     const state = conversationState.get(from) || { step: 'template_sent' };
+    console.log('Current state:', state.step);
 
     if (state.step === 'template_sent') {
       conversationState.set(from, { step: 'awaiting_dob' });
