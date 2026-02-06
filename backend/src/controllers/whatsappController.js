@@ -60,7 +60,7 @@ const sendTextMessage = async (to, text) => {
 const checkAndSendTemplate = async () => {
   try {
     const [rows] = await db.execute(
-      'SELECT id, Name, MobileNo FROM customer WHERE Name IS NOT NULL AND MobileNo IS NOT NULL AND (DOB IS NULL OR DOA IS NULL) AND IsActive = ?',
+      'SELECT id, Name, MobileNo FROM customer WHERE Name IS NOT NULL AND MobileNo IS NOT NULL AND DOB IS NULL AND DOA IS NULL AND IsActive = ?',
       ['Y']
     );
 
@@ -69,6 +69,7 @@ const checkAndSendTemplate = async () => {
       if (!processedCustomers.has(key)) {
         await sendTemplateMessage(customer.MobileNo, '234', '123');
         processedCustomers.add(key);
+        conversationState.set(customer.MobileNo, { step: 'template_sent' });
         console.log(`Template sent to ${customer.MobileNo}`);
       }
     }
@@ -112,9 +113,12 @@ const webhookPost = async (req, res) => {
     }
 
     const customer = rows[0];
-    const state = conversationState.get(from) || { step: 'awaiting_dob' };
+    const state = conversationState.get(from) || { step: 'template_sent' };
 
-    if (state.step === 'awaiting_dob') {
+    if (state.step === 'template_sent') {
+      conversationState.set(from, { step: 'awaiting_dob' });
+      await sendTextMessage(from, 'Please enter your Date of Birth (YYYY-MM-DD):');
+    } else if (state.step === 'awaiting_dob') {
       const dobRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (dobRegex.test(userInput)) {
         await db.execute('UPDATE customer SET DOB = ? WHERE MobileNo = ?', [userInput, from]);
