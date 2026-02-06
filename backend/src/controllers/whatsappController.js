@@ -28,7 +28,7 @@ const sendTemplateMessage = async (to, billNo, amount) => {
     type: 'template',
     template: {
       name: process.env.TEMPLATE_ID,
-      language: { code: 'ta' },
+      language: { code: 'en' },
       components: [
         {
           type: 'body',
