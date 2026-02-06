@@ -2,6 +2,7 @@ const axios = require('axios');
 const db = require('../config/database');
 
 const conversationState = new Map();
+const processedCustomers = new Set();
 
 const sendWhatsAppMessage = async (to, message) => {
   try {
@@ -20,20 +21,23 @@ const sendWhatsAppMessage = async (to, message) => {
   }
 };
 
-const sendInteractiveMessage = async (to, bodyText) => {
+const sendTemplateMessage = async (to, billNo, amount) => {
   const message = {
     messaging_product: 'whatsapp',
     to: to,
-    type: 'interactive',
-    interactive: {
-      type: 'button',
-      body: { text: bodyText },
-      action: {
-        buttons: [
-          { type: 'reply', reply: { id: 'yes', title: 'Yes' } },
-          { type: 'reply', reply: { id: 'no', title: 'No' } }
-        ]
-      }
+    type: 'template',
+    template: {
+      name: process.env.TEMPLATE_ID,
+      language: { code: 'ta' },
+      components: [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: billNo },
+            { type: 'text', text: amount }
+          ]
+        }
+      ]
     }
   };
   await sendWhatsAppMessage(to, message);
@@ -47,6 +51,26 @@ const sendTextMessage = async (to, text) => {
     text: { body: text }
   };
   await sendWhatsAppMessage(to, message);
+};
+
+const checkAndSendTemplate = async () => {
+  try {
+    const [rows] = await db.execute(
+      'SELECT id, Name, MobileNo FROM customer WHERE Name IS NOT NULL AND MobileNo IS NOT NULL AND (DOB IS NULL OR DOA IS NULL) AND IsActive = ?',
+      ['Y']
+    );
+
+    for (const customer of rows) {
+      const key = `${customer.MobileNo}_${customer.id}`;
+      if (!processedCustomers.has(key)) {
+        await sendTemplateMessage(customer.MobileNo, '234', '123');
+        processedCustomers.add(key);
+        console.log(`Template sent to ${customer.MobileNo}`);
+      }
+    }
+  } catch (error) {
+    console.error('Template check error:', error);
+  }
 };
 
 const webhookVerify = (req, res) => {
@@ -67,39 +91,30 @@ const webhookPost = async (req, res) => {
     const change = entry?.changes?.[0];
     const message = change?.value?.messages?.[0];
 
-    if (!message) {
+    if (!message || message.type !== 'text') {
       return res.sendStatus(200);
     }
 
     const from = message.from;
-    const messageType = message.type;
-    let userInput = '';
+    const userInput = message.text.body.trim();
 
-    if (messageType === 'text') {
-      userInput = message.text.body.trim();
-    } else if (messageType === 'interactive') {
-      userInput = message.interactive.button_reply.id;
+    const [rows] = await db.execute(
+      'SELECT id, Name, MobileNo, DOB, DOA FROM customer WHERE MobileNo = ? AND IsActive = ?',
+      [from, 'Y']
+    );
+
+    if (rows.length === 0) {
+      return res.sendStatus(200);
     }
 
-    const state = conversationState.get(from) || { step: 'initial' };
+    const customer = rows[0];
+    const state = conversationState.get(from) || { step: 'awaiting_dob' };
 
-    if (state.step === 'initial') {
-      await sendInteractiveMessage(from, 'Are you willing to use our service?');
-      conversationState.set(from, { step: 'awaiting_consent' });
-    } else if (state.step === 'awaiting_consent') {
-      if (userInput === 'yes') {
-        await sendTextMessage(from, 'Please enter your Date of Birth (YYYY-MM-DD):');
-        conversationState.set(from, { step: 'awaiting_dob', name: change.value.contacts?.[0]?.profile?.name || '' });
-      } else {
-        await sendTextMessage(from, 'Thank you for your time!');
-        conversationState.delete(from);
-      }
-    } else if (state.step === 'awaiting_dob') {
+    if (state.step === 'awaiting_dob') {
       const dobRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (dobRegex.test(userInput)) {
-        state.dob = userInput;
-        state.step = 'awaiting_doa';
-        conversationState.set(from, state);
+        await db.execute('UPDATE customer SET DOB = ? WHERE MobileNo = ?', [userInput, from]);
+        conversationState.set(from, { step: 'awaiting_doa' });
         await sendTextMessage(from, 'Please enter your Date of Anniversary (YYYY-MM-DD):');
       } else {
         await sendTextMessage(from, 'Invalid format. Please enter Date of Birth in YYYY-MM-DD format:');
@@ -107,18 +122,24 @@ const webhookPost = async (req, res) => {
     } else if (state.step === 'awaiting_doa') {
       const doaRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (doaRegex.test(userInput)) {
-        state.doa = userInput;
-        
-        const [result] = await db.execute(
-          'INSERT INTO customers (Name, MobileNo, DOB, DOA) VALUES (?, ?, ?, ?)',
-          [state.name, from, state.dob, state.doa]
-        );
-
-        await sendTextMessage(from, 'Thank you! Your information has been saved successfully. 🎉');
-        conversationState.delete(from);
+        await db.execute('UPDATE customer SET DOA = ? WHERE MobileNo = ?', [userInput, from]);
+        conversationState.set(from, { step: 'awaiting_name_confirmation' });
+        await sendTextMessage(from, `Want to update name? Already you have name "${customer.Name}". Is this valid name or if you want to change type "Yes"`);
       } else {
         await sendTextMessage(from, 'Invalid format. Please enter Date of Anniversary in YYYY-MM-DD format:');
       }
+    } else if (state.step === 'awaiting_name_confirmation') {
+      if (userInput.toLowerCase() === 'yes') {
+        conversationState.set(from, { step: 'awaiting_new_name' });
+        await sendTextMessage(from, 'Please enter your name:');
+      } else {
+        await sendTextMessage(from, 'Thank you! Your information has been saved successfully. 🎉');
+        conversationState.delete(from);
+      }
+    } else if (state.step === 'awaiting_new_name') {
+      await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, from]);
+      await sendTextMessage(from, 'Thank you! Your information has been saved successfully. 🎉');
+      conversationState.delete(from);
     }
 
     res.sendStatus(200);
@@ -127,5 +148,7 @@ const webhookPost = async (req, res) => {
     res.sendStatus(500);
   }
 };
+
+setInterval(checkAndSendTemplate, 10000);
 
 module.exports = { webhookVerify, webhookPost };
