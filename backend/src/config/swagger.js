@@ -14,6 +14,10 @@ const options = {
         url: 'http://localhost:4000/api',
         description: 'Development server',
       },
+      {
+        url: 'http://147.79.67.93:3050/api',
+        description: 'Production server',
+      },
     ],
   },
   apis: ['./src/routes/*.js'],
