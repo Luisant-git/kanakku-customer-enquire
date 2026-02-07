@@ -2,7 +2,7 @@ const axios = require('axios');
 const db = require('../config/database');
 
 const conversationState = new Map();
-const processedCustomers = new Set();
+const processedMessageIds = new Set();
 
 const sendWhatsAppMessage = async (to, message) => {
   try {
@@ -94,6 +94,13 @@ const webhookPost = async (req, res) => {
       console.log('Not a text message, ignoring');
       return res.sendStatus(200);
     }
+
+    // Check if message already processed
+    if (processedMessageIds.has(message.id)) {
+      console.log('Message already processed:', message.id);
+      return res.sendStatus(200);
+    }
+    processedMessageIds.add(message.id);
 
     const from = message.from;
     const mobileNoWithout91 = from.startsWith('91') ? from.substring(2) : from;
