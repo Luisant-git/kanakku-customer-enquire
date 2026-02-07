@@ -57,37 +57,7 @@ const sendTextMessage = async (to, text) => {
   await sendWhatsAppMessage(to, message);
 };
 
-const sentToday = new Set();
 
-const checkAndSendTemplate = async () => {
-  try {
-    const now = new Date();
-    const istTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    const currentHour = istTime.getHours();
-    const today = istTime.toISOString().split('T')[0];
-    
-    if (currentHour !== 18) {
-      return;
-    }
-    
-    const [rows] = await db.execute(
-      'SELECT id, Name, MobileNo FROM customer WHERE Name IS NOT NULL AND MobileNo IS NOT NULL AND DOB IS NULL AND DOA IS NULL AND IsActive = ?',
-      ['Y']
-    );
-
-    for (const customer of rows) {
-      const key = `${customer.MobileNo}_${today}`;
-      if (!sentToday.has(key)) {
-        await sendTemplateMessage(customer.MobileNo, '234', '123');
-        sentToday.add(key);
-        conversationState.set(customer.MobileNo, { step: 'template_sent' });
-        console.log(`Template sent to ${customer.MobileNo}`);
-      }
-    }
-  } catch (error) {
-    console.error('Template check error:', error);
-  }
-};
 
 const webhookVerify = (req, res) => {
   const mode = req.query['hub.mode'];
@@ -144,10 +114,10 @@ const webhookPost = async (req, res) => {
 
     const customer = rows[0];
     const dbMobileNo = customer.MobileNo;
-    const state = conversationState.get(dbMobileNo) || { step: 'template_sent' };
-    console.log('Current state:', state.step);
+    const state = conversationState.get(dbMobileNo);
+    console.log('Current state:', state?.step);
 
-    if (state.step === 'template_sent') {
+    if (!state) {
       conversationState.set(dbMobileNo, { step: 'awaiting_dob' });
       await sendTextMessage(from, 'Please enter your Date of Birth (DD-MM-YYYY):');
     } else if (state.step === 'awaiting_dob') {
@@ -188,7 +158,5 @@ const webhookPost = async (req, res) => {
     res.sendStatus(500);
   }
 };
-
-setInterval(checkAndSendTemplate, 10000);
 
 module.exports = { webhookVerify, webhookPost };
