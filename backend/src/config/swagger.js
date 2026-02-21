@@ -15,7 +15,7 @@ const options = {
         description: 'Development server',
       },
       {
-        url: 'http://147.79.67.93:3050/api',
+        url: 'https://enquiry.api.luisant.cloud/api',
         description: 'Production server',
       },
     ],
