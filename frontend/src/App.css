@@ -1,0 +1,12 @@
+.app {
+  min-height: 100vh;
+}
+
+.main-container {
+  display: flex;
+}
+
+.content {
+  flex: 1;
+  min-height: calc(100vh - 60px);
+}
