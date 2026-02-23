@@ -235,10 +235,36 @@ const bulkUploadCustomers = async (req, res) => {
 
 const getCustomers = async (req, res) => {
   try {
-    const customers = await prisma.customer.findMany({
-      orderBy: { createdAt: 'desc' }
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const where = search ? {
+      OR: [
+        { name: { contains: search, mode: 'insensitive' } },
+        { phoneNumber: { contains: search } },
+        { campaign: { contains: search, mode: 'insensitive' } }
+      ]
+    } : {};
+    
+    const [customers, total] = await Promise.all([
+      prisma.customer.findMany({
+        where,
+        skip,
+        take: parseInt(limit),
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.customer.count({ where })
+    ]);
+    
+    res.json({
+      customers,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / parseInt(limit))
+      }
     });
-    res.json(customers);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

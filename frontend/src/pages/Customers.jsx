@@ -4,23 +4,42 @@ import { getCustomers } from '../api/customer';
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [search, setSearch] = useState('');
+  const [pagination, setPagination] = useState({ total: 0, totalPages: 0 });
 
   useEffect(() => {
     fetchCustomers();
-  }, []);
+  }, [page, search]);
 
   const fetchCustomers = async () => {
     try {
-      const data = await getCustomers();
-      setCustomers(data);
+      const data = await getCustomers(page, limit, search);
+      setCustomers(data.customers);
+      setPagination(data.pagination);
     } catch (error) {
       console.error('Error fetching customers:', error);
     }
   };
 
+  const handleSearch = (e) => {
+    setSearch(e.target.value);
+    setPage(1);
+  };
+
   return (
     <div className="customers">
-      <h2>Customers</h2>
+      <div className="header-section">
+        <h2>Customers</h2>
+        <input
+          type="text"
+          placeholder="Search by name, phone, or campaign..."
+          value={search}
+          onChange={handleSearch}
+          className="search-input"
+        />
+      </div>
       <table>
         <thead>
           <tr>
@@ -45,6 +64,11 @@ const Customers = () => {
           ))}
         </tbody>
       </table>
+      <div className="pagination">
+        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</button>
+        <span>Page {page} of {pagination.totalPages} ({pagination.total} total)</span>
+        <button onClick={() => setPage(p => p + 1)} disabled={page >= pagination.totalPages}>Next</button>
+      </div>
     </div>
   );
 };
