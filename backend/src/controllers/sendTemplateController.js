@@ -15,7 +15,14 @@ const convertToMp4 = (inputPath) => {
     ffmpeg(inputPath)
       .videoCodec('libx264')
       .audioCodec('aac')
-      .outputOptions(['-profile:v', 'baseline', '-level', '3.0', '-pix_fmt', 'yuv420p'])
+      .outputOptions([
+        '-profile:v', 'baseline',
+        '-level', '3.0',
+        '-pix_fmt', 'yuv420p',
+        '-crf', '23',
+        '-preset', 'medium',
+        '-movflags', '+faststart'
+      ])
       .output(outputPath)
       .on('end', () => resolve(outputPath))
       .on('error', reject)
