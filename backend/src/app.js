@@ -21,7 +21,7 @@ const pgPool = new Pool({
 });
 
 app.use(cors({ 
-  origin: '*', 
+  origin: ['http://localhost:5173', 'https://enquiry.luisant.cloud', 'https://enquiry.api.luisant.cloud'], 
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
