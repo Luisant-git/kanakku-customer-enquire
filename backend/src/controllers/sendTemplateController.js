@@ -3,18 +3,53 @@ const prisma = require('../config/prisma');
 const FormData = require('form-data');
 const fs = require('fs');
 const path = require('path');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegPath = require('ffmpeg-static');
+
+ffmpeg.setFfmpegPath(ffmpegPath);
+
+const convertToMp4 = (inputPath) => {
+  return new Promise((resolve, reject) => {
+    const outputPath = inputPath.replace(/\.(h264|264|mkv)$/i, '.mp4');
+    if (inputPath === outputPath) return resolve(inputPath);
+    
+    ffmpeg(inputPath)
+      .outputOptions('-c:v', 'libx264', '-c:a', 'aac')
+      .output(outputPath)
+      .on('end', () => resolve(outputPath))
+      .on('error', reject)
+      .run();
+  });
+};
 
 const uploadMediaToWhatsApp = async (mediaUrl, phoneNumberId, accessToken) => {
   try {
     // Download media from URL
     const mediaResponse = await axios.get(mediaUrl, { responseType: 'arraybuffer' });
-    const buffer = Buffer.from(mediaResponse.data);
+    let buffer = Buffer.from(mediaResponse.data);
+    let contentType = mediaResponse.headers['content-type'];
+    let filename = path.basename(mediaUrl);
+    
+    // Convert H.264/MKV to MP4 if needed
+    if (contentType === 'video/h264' || filename.match(/\.(h264|264|mkv)$/i)) {
+      const tempInput = path.join('/tmp', `temp_${Date.now()}_${filename}`);
+      fs.writeFileSync(tempInput, buffer);
+      
+      const convertedPath = await convertToMp4(tempInput);
+      buffer = fs.readFileSync(convertedPath);
+      contentType = 'video/mp4';
+      filename = path.basename(convertedPath);
+      
+      // Cleanup temp files
+      fs.unlinkSync(tempInput);
+      if (convertedPath !== tempInput) fs.unlinkSync(convertedPath);
+    }
     
     // Create form data
     const formData = new FormData();
     formData.append('file', buffer, {
-      filename: path.basename(mediaUrl),
-      contentType: mediaResponse.headers['content-type']
+      filename,
+      contentType
     });
     formData.append('messaging_product', 'whatsapp');
     
