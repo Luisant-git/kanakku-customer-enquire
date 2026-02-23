@@ -9,7 +9,9 @@ const SendTemplate = () => {
   const [name, setName] = useState('');
   const [configId, setConfigId] = useState('');
   const [configs, setConfigs] = useState([]);
-  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
 
   useEffect(() => {
     fetchConfigs();
@@ -28,16 +30,21 @@ const SendTemplate = () => {
 
   const handleSend = async (e) => {
     e.preventDefault();
+    setLoading(true);
     try {
       const response = await axios.post(`${API_URL}/api/send-configured-template`, 
         { phoneNumber, name, configId: configId || undefined },
         { withCredentials: true }
       );
-      setMessage(`Template sent successfully using ${response.data.config}!`);
+      setModalMessage(`Template sent successfully using ${response.data.config}!`);
+      setShowModal(true);
       setPhoneNumber('');
       setName('');
     } catch (error) {
-      setMessage('Error sending template');
+      setModalMessage('Error sending template');
+      setShowModal(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -51,6 +58,7 @@ const SendTemplate = () => {
           value={phoneNumber}
           onChange={(e) => setPhoneNumber(e.target.value)}
           required
+          disabled={loading}
         />
         <input
           type="text"
@@ -58,10 +66,12 @@ const SendTemplate = () => {
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
+          disabled={loading}
         />
         <select
           value={configId}
           onChange={(e) => setConfigId(e.target.value)}
+          disabled={loading}
         >
           <option value="">Use Default Configuration</option>
           {configs.map((config) => (
@@ -70,9 +80,20 @@ const SendTemplate = () => {
             </option>
           ))}
         </select>
-        <button type="submit">Send Template</button>
+        <button type="submit" disabled={loading}>
+          {loading ? 'Sending...' : 'Send Template'}
+        </button>
       </form>
-      {message && <p className="message">{message}</p>}
+
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{modalMessage.includes('Error') ? '❌ Error' : '✅ Success'}</h3>
+            <p>{modalMessage}</p>
+            <button onClick={() => setShowModal(false)}>Close</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
