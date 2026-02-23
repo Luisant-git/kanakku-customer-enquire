@@ -1,5 +1,41 @@
 const axios = require('axios');
 const prisma = require('../config/prisma');
+const FormData = require('form-data');
+const fs = require('fs');
+const path = require('path');
+
+const uploadMediaToWhatsApp = async (mediaUrl, phoneNumberId, accessToken) => {
+  try {
+    // Download media from URL
+    const mediaResponse = await axios.get(mediaUrl, { responseType: 'arraybuffer' });
+    const buffer = Buffer.from(mediaResponse.data);
+    
+    // Create form data
+    const formData = new FormData();
+    formData.append('file', buffer, {
+      filename: path.basename(mediaUrl),
+      contentType: mediaResponse.headers['content-type']
+    });
+    formData.append('messaging_product', 'whatsapp');
+    
+    // Upload to WhatsApp
+    const uploadResponse = await axios.post(
+      `https://graph.facebook.com/v21.0/${phoneNumberId}/media`,
+      formData,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          ...formData.getHeaders()
+        }
+      }
+    );
+    
+    return uploadResponse.data.id;
+  } catch (error) {
+    console.error('Error uploading media to WhatsApp:', error.response?.data || error.message);
+    throw error;
+  }
+};
 
 const sendConfiguredTemplate = async (req, res) => {
   try {
@@ -28,19 +64,33 @@ const sendConfiguredTemplate = async (req, res) => {
     
     if (config.headerMedia && config.headerMediaType) {
       const mediaType = config.headerMediaType.toLowerCase();
-      message.template.components = [
-        {
-          type: 'header',
-          parameters: [
-            {
-              type: mediaType,
-              [mediaType]: {
-                link: config.headerMedia
+      
+      // Upload media to WhatsApp and get media ID
+      let mediaId;
+      try {
+        mediaId = await uploadMediaToWhatsApp(config.headerMedia, config.phoneNumberId, config.accessToken);
+        console.log('Media uploaded to WhatsApp, ID:', mediaId);
+      } catch (uploadError) {
+        console.error('Failed to upload media, sending without header');
+      }
+      
+      if (mediaId) {
+        message.template.components = [
+          {
+            type: 'header',
+            parameters: [
+              {
+                type: mediaType,
+                [mediaType]: {
+                  id: mediaId
+                }
               }
-            }
-          ]
-        }
-      ];
+            ]
+          }
+        ];
+      }
+    } else if (!config.headerMedia) {
+      console.log('Sending template without header media');
     }
     
     const response = await axios.post(
