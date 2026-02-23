@@ -39,8 +39,8 @@ const Customers = () => {
               <td>{customer.phoneNumber}</td>
               <td>{customer.campaign}</td>
               <td><span className={`status ${customer.status}`}>{customer.status}</span></td>
-              <td>{new Date(customer.sentAt).toLocaleString()}</td>
-              <td>{new Date(customer.createdAt).toLocaleString()}</td>
+              <td>{customer.sentAt ? new Date(customer.sentAt).toLocaleString() : '-'}</td>
+              <td>{customer.createdAt ? new Date(customer.createdAt).toLocaleString() : '-'}</td>
             </tr>
           ))}
         </tbody>
