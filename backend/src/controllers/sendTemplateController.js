@@ -10,11 +10,12 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 
 const convertToMp4 = (inputPath) => {
   return new Promise((resolve, reject) => {
-    const outputPath = inputPath.replace(/\.(h264|264|mkv)$/i, '.mp4');
-    if (inputPath === outputPath) return resolve(inputPath);
+    const outputPath = inputPath.replace(/\.(h264|264|mkv|mp4)$/i, '_converted.mp4');
     
     ffmpeg(inputPath)
-      .outputOptions('-c:v', 'libx264', '-c:a', 'aac')
+      .videoCodec('libx264')
+      .audioCodec('aac')
+      .outputOptions(['-profile:v', 'baseline', '-level', '3.0', '-pix_fmt', 'yuv420p'])
       .output(outputPath)
       .on('end', () => resolve(outputPath))
       .on('error', reject)
@@ -30,8 +31,8 @@ const uploadMediaToWhatsApp = async (mediaUrl, phoneNumberId, accessToken) => {
     let contentType = mediaResponse.headers['content-type'];
     let filename = path.basename(mediaUrl);
     
-    // Convert H.264/MKV to MP4 if needed
-    if (contentType === 'video/h264' || filename.match(/\.(h264|264|mkv)$/i)) {
+    // Convert all videos to H.264 MP4 for WhatsApp compatibility
+    if (contentType?.startsWith('video/') || filename.match(/\.(h264|264|mkv|mp4|mov|avi)$/i)) {
       const tempInput = path.join('/tmp', `temp_${Date.now()}_${filename}`);
       fs.writeFileSync(tempInput, buffer);
       
@@ -42,7 +43,7 @@ const uploadMediaToWhatsApp = async (mediaUrl, phoneNumberId, accessToken) => {
       
       // Cleanup temp files
       fs.unlinkSync(tempInput);
-      if (convertedPath !== tempInput) fs.unlinkSync(convertedPath);
+      fs.unlinkSync(convertedPath);
     }
     
     // Create form data
