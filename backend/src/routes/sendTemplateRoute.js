@@ -8,6 +8,6 @@ const router = express.Router();
 router.post('/send-configured-template', authMiddleware, sendConfiguredTemplate);
 router.post('/bulk-upload-customers', authMiddleware, upload.single('file'), bulkUploadCustomers);
 router.get('/available-configs', authMiddleware, getAvailableConfigs);
-router.get('/customers', authMiddleware, getCustomers);
+router.get('/campaign-customers', authMiddleware, getCustomers);
 
 module.exports = router;

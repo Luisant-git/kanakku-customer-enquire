@@ -8,7 +8,7 @@ const api = axios.create({
 });
 
 export const getCustomers = async () => {
-  const response = await api.get('/api/customers');
+  const response = await api.get('/api/campaign-customers');
   return response.data;
 };
 
