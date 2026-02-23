@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Header from './components/Header.jsx';
 import Sidebar from './components/Sidebar.jsx';
@@ -11,6 +11,8 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import './App.css';
 
 function App() {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <BrowserRouter>
       <Routes>
@@ -18,9 +20,9 @@ function App() {
         <Route path="/*" element={
           <ProtectedRoute>
             <div className="app">
-              <Header />
+              <Header onMenuToggle={setMenuOpen} />
               <div className="main-container">
-                <Sidebar />
+                <Sidebar isOpen={menuOpen} onClose={() => setMenuOpen(false)} />
                 <main className="content">
                   <Routes>
                     <Route path="/" element={<Dashboard />} />

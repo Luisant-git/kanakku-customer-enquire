@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './Customers.css';
 import { getCustomers } from '../api/customer';
+import { FiUsers, FiSearch, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { BsCheckCircle, BsXCircle } from 'react-icons/bs';
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
@@ -30,44 +32,71 @@ const Customers = () => {
 
   return (
     <div className="customers">
-      <div className="header-section">
-        <h2>Customers</h2>
-        <input
-          type="text"
-          placeholder="Search by name, phone, or campaign..."
-          value={search}
-          onChange={handleSearch}
-          className="search-input"
-        />
+      <div className="page-header">
+        <div>
+          <h2><FiUsers /> Customers</h2>
+          <p>View all customers who received template messages</p>
+        </div>
+        <div className="search-box">
+          <FiSearch className="search-icon" />
+          <input
+            type="text"
+            placeholder="Search by name, phone, or campaign..."
+            value={search}
+            onChange={handleSearch}
+            className="search-input"
+          />
+        </div>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Phone Number</th>
-            <th>Campaign</th>
-            <th>Status</th>
-            <th>Sent At</th>
-            <th>Created At</th>
-          </tr>
-        </thead>
-        <tbody>
-          {customers.map((customer) => (
-            <tr key={customer.id}>
-              <td>{customer.name}</td>
-              <td>{customer.phoneNumber}</td>
-              <td>{customer.campaign}</td>
-              <td><span className={`status ${customer.status}`}>{customer.status}</span></td>
-              <td>{customer.sentAt ? new Date(customer.sentAt).toLocaleString() : '-'}</td>
-              <td>{customer.createdAt ? new Date(customer.createdAt).toLocaleString() : '-'}</td>
+
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Phone Number</th>
+              <th>Campaign</th>
+              <th>Status</th>
+              <th>Sent At</th>
+              <th>Created At</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {customers.length > 0 ? (
+              customers.map((customer) => (
+                <tr key={customer.id}>
+                  <td>{customer.name}</td>
+                  <td>{customer.phoneNumber}</td>
+                  <td><span className="campaign-badge">{customer.campaign}</span></td>
+                  <td>
+                    <span className={`status-badge ${customer.status}`}>
+                      {customer.status === 'sent' ? <BsCheckCircle /> : <BsXCircle />}
+                      {customer.status}
+                    </span>
+                  </td>
+                  <td>{customer.sentAt ? new Date(customer.sentAt).toLocaleString() : '-'}</td>
+                  <td>{customer.createdAt ? new Date(customer.createdAt).toLocaleString() : '-'}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="6" className="no-data">No customers found</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
       <div className="pagination">
-        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</button>
-        <span>Page {page} of {pagination.totalPages} ({pagination.total} total)</span>
-        <button onClick={() => setPage(p => p + 1)} disabled={page >= pagination.totalPages}>Next</button>
+        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="pagination-btn">
+          <FiChevronLeft /> Previous
+        </button>
+        <span className="pagination-info">
+          Page {page} of {pagination.totalPages} ({pagination.total} total)
+        </span>
+        <button onClick={() => setPage(p => p + 1)} disabled={page >= pagination.totalPages} className="pagination-btn">
+          Next <FiChevronRight />
+        </button>
       </div>
     </div>
   );
