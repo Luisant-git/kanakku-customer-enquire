@@ -166,7 +166,7 @@ const sendConfiguredTemplate = async (req, res) => {
             name,
             phoneNumber,
             campaign,
-            status: 'sent',
+            status: 'delivered',
             sentAt: new Date()
           }
         });
@@ -174,6 +174,15 @@ const sendConfiguredTemplate = async (req, res) => {
         results.push({ phoneNumber, name, status: 'success' });
         console.log(`Template sent to ${phoneNumber} (${name}) - Campaign: ${campaign}`);
       } catch (error) {
+        await prisma.customer.create({
+          data: {
+            name,
+            phoneNumber,
+            campaign,
+            status: 'failed',
+            sentAt: new Date()
+          }
+        });
         results.push({ phoneNumber, name, status: 'failed', error: error.message });
         console.error(`Failed to send to ${phoneNumber}:`, error.message);
       }
@@ -270,4 +279,18 @@ const getCustomers = async (req, res) => {
   }
 };
 
-module.exports = { sendConfiguredTemplate, getAvailableConfigs, bulkUploadCustomers, getCustomers };
+const getStats = async (req, res) => {
+  try {
+    const [total, delivered, failed] = await Promise.all([
+      prisma.customer.count(),
+      prisma.customer.count({ where: { status: 'delivered' } }),
+      prisma.customer.count({ where: { status: 'failed' } })
+    ]);
+    
+    res.json({ total, delivered, failed });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports = { sendConfiguredTemplate, getAvailableConfigs, bulkUploadCustomers, getCustomers, getStats };

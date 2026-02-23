@@ -19,6 +19,11 @@ export const getFormCustomers = async () => {
   return response.data;
 };
 
+export const getStats = async () => {
+  const response = await api.get('/api/stats');
+  return response.data;
+};
+
 export const bulkUploadCustomers = async (file) => {
   const formData = new FormData();
   formData.append('file', file);

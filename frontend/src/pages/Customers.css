@@ -121,7 +121,8 @@ tbody tr:hover {
   text-transform: capitalize;
 }
 
-.status-badge.sent {
+.status-badge.sent,
+.status-badge.delivered {
   background: #d4edda;
   color: #155724;
 }
