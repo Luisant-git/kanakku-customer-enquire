@@ -103,7 +103,7 @@ const sendConfiguredTemplate = async (req, res) => {
     
     let config;
     if (configId) {
-      config = await prisma.templateConfig.findUnique({ where: { id: configId, isActive: true } });
+      config = await prisma.templateConfig.findUnique({ where: { id: parseInt(configId), isActive: true } });
     } else {
       config = await prisma.templateConfig.findFirst({ where: { isDefault: true, isActive: true } });
     }
