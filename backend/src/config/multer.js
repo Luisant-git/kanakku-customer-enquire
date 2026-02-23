@@ -11,17 +11,19 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|pdf|mp4|avi|mov|mkv|h264|264/;
+  const allowedTypes = /jpeg|jpg|png|gif|pdf|mp4|avi|mov|mkv|h264|264|xlsx|xls/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   const mimetype = file.mimetype.startsWith('image/') || 
                    file.mimetype.startsWith('video/') || 
                    file.mimetype === 'application/pdf' ||
+                   file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                   file.mimetype === 'application/vnd.ms-excel' ||
                    file.mimetype === 'application/octet-stream';
   
   if (extname && mimetype) {
     cb(null, true);
   } else {
-    cb(new Error('Only images (JPG, PNG, GIF), PDFs, and videos (MP4, AVI, MOV, MKV, H264) are allowed'));
+    cb(new Error('Only images, PDFs, videos, and Excel files are allowed'));
   }
 };
 

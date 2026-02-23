@@ -38,3 +38,13 @@ model TemplateConfig {
     createdAt       DateTime @default(now())
     updatedAt       DateTime @updatedAt
 }
+
+model Customer {
+    id          Int      @id @default(autoincrement())
+    name        String
+    phoneNumber String
+    campaign    String
+    status      String   @default("sent")
+    sentAt      DateTime @default(now())
+    createdAt   DateTime @default(now())
+}

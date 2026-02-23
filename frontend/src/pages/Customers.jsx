@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import './Customers.css';
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { getCustomers } from '../api/customer';
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
@@ -13,8 +11,8 @@ const Customers = () => {
 
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/customer`);
-      setCustomers(response.data);
+      const data = await getCustomers();
+      setCustomers(data);
     } catch (error) {
       console.error('Error fetching customers:', error);
     }
@@ -27,18 +25,22 @@ const Customers = () => {
         <thead>
           <tr>
             <th>Name</th>
-            <th>Mobile</th>
-            <th>DOB</th>
-            <th>DOA</th>
+            <th>Phone Number</th>
+            <th>Campaign</th>
+            <th>Status</th>
+            <th>Sent At</th>
+            <th>Created At</th>
           </tr>
         </thead>
         <tbody>
           {customers.map((customer) => (
             <tr key={customer.id}>
-              <td>{customer.Name}</td>
-              <td>{customer.MobileNo}</td>
-              <td>{customer.DOB || '-'}</td>
-              <td>{customer.DOA || '-'}</td>
+              <td>{customer.name}</td>
+              <td>{customer.phoneNumber}</td>
+              <td>{customer.campaign}</td>
+              <td><span className={`status ${customer.status}`}>{customer.status}</span></td>
+              <td>{new Date(customer.sentAt).toLocaleString()}</td>
+              <td>{new Date(customer.createdAt).toLocaleString()}</td>
             </tr>
           ))}
         </tbody>

@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import './TemplateConfig.css';
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { getTemplateConfigs, createTemplateConfig, updateTemplateConfig, deleteTemplateConfig, uploadFile } from '../api/template';
 
 const TemplateConfig = () => {
   const [configs, setConfigs] = useState([]);
@@ -30,15 +28,9 @@ const TemplateConfig = () => {
     if (!file) return;
 
     setUploading(true);
-    const formDataUpload = new FormData();
-    formDataUpload.append('file', file);
-
     try {
-      const response = await axios.post(`${API_URL}/api/upload`, formDataUpload, {
-        withCredentials: true,
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setFormData({ ...formData, headerMedia: response.data.url });
+      const data = await uploadFile(file);
+      setFormData({ ...formData, headerMedia: data.url });
     } catch (error) {
       console.error('Error uploading file:', error);
     } finally {
@@ -48,8 +40,8 @@ const TemplateConfig = () => {
 
   const fetchConfigs = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/template-config`, { withCredentials: true });
-      setConfigs(response.data);
+      const data = await getTemplateConfigs();
+      setConfigs(data);
     } catch (error) {
       console.error('Error fetching configs:', error);
     }
@@ -59,9 +51,9 @@ const TemplateConfig = () => {
     e.preventDefault();
     try {
       if (editId) {
-        await axios.put(`${API_URL}/api/template-config/${editId}`, formData, { withCredentials: true });
+        await updateTemplateConfig(editId, formData);
       } else {
-        await axios.post(`${API_URL}/api/template-config`, formData, { withCredentials: true });
+        await createTemplateConfig(formData);
       }
       fetchConfigs();
       resetForm();
@@ -79,7 +71,7 @@ const TemplateConfig = () => {
   const handleDelete = async (id) => {
     if (confirm('Delete this configuration?')) {
       try {
-        await axios.delete(`${API_URL}/api/template-config/${id}`, { withCredentials: true });
+        await deleteTemplateConfig(id);
         fetchConfigs();
       } catch (error) {
         console.error('Error deleting config:', error);

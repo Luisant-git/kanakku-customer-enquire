@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import './SendTemplate.css';
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { bulkUploadCustomers } from '../api/customer';
+import { getAvailableConfigs, sendConfiguredTemplate } from '../api/sendTemplate';
 
 const SendTemplate = () => {
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [name, setName] = useState('');
+  const [customers, setCustomers] = useState([{ phoneNumber: '', name: '' }]);
   const [configId, setConfigId] = useState('');
+  const [campaign, setCampaign] = useState('');
   const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [modalMessage, setModalMessage] = useState('');
+  const [results, setResults] = useState([]);
 
   useEffect(() => {
     fetchConfigs();
@@ -19,12 +18,38 @@ const SendTemplate = () => {
 
   const fetchConfigs = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/available-configs`, { withCredentials: true });
-      setConfigs(response.data);
-      const defaultConfig = response.data.find(c => c.isDefault);
+      const data = await getAvailableConfigs();
+      setConfigs(data);
+      const defaultConfig = data.find(c => c.isDefault);
       if (defaultConfig) setConfigId(defaultConfig.id);
     } catch (error) {
       console.error('Error fetching configs:', error);
+    }
+  };
+
+  const addCustomer = () => {
+    setCustomers([...customers, { phoneNumber: '', name: '' }]);
+  };
+
+  const removeCustomer = (index) => {
+    setCustomers(customers.filter((_, i) => i !== index));
+  };
+
+  const updateCustomer = (index, field, value) => {
+    const updated = [...customers];
+    updated[index][field] = value;
+    setCustomers(updated);
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    try {
+      const data = await bulkUploadCustomers(file);
+      setCustomers(data.customers);
+    } catch (error) {
+      alert('Failed to upload Excel file');
     }
   };
 
@@ -32,16 +57,13 @@ const SendTemplate = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/api/send-configured-template`, 
-        { phoneNumber, name, configId: configId || undefined },
-        { withCredentials: true }
-      );
-      setModalMessage(`Template sent successfully using ${response.data.config}!`);
+      const data = await sendConfiguredTemplate({ customers, configId: configId || undefined, campaign });
+      setResults(data.results);
       setShowModal(true);
-      setPhoneNumber('');
-      setName('');
+      setCustomers([{ phoneNumber: '', name: '' }]);
+      setCampaign('');
     } catch (error) {
-      setModalMessage('Error sending template');
+      setResults([{ status: 'error', error: error.response?.data?.error || 'Failed to send templates' }]);
       setShowModal(true);
     } finally {
       setLoading(false);
@@ -54,20 +76,54 @@ const SendTemplate = () => {
       <form onSubmit={handleSend}>
         <input
           type="text"
-          placeholder="Phone Number (with country code)"
-          value={phoneNumber}
-          onChange={(e) => setPhoneNumber(e.target.value)}
+          placeholder="Campaign Name"
+          value={campaign}
+          onChange={(e) => setCampaign(e.target.value)}
           required
           disabled={loading}
+          className="campaign-input"
         />
-        <input
-          type="text"
-          placeholder="Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          disabled={loading}
-        />
+        <div className="upload-section">
+          <label htmlFor="excel-upload" className="upload-label">
+            📊 Upload Excel (Phone & Name columns)
+          </label>
+          <input
+            id="excel-upload"
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileUpload}
+            disabled={loading}
+            style={{ display: 'none' }}
+          />
+        </div>
+        {customers.map((customer, index) => (
+          <div key={index} className="customer-row">
+            <input
+              type="text"
+              placeholder="Phone Number (with country code)"
+              value={customer.phoneNumber}
+              onChange={(e) => updateCustomer(index, 'phoneNumber', e.target.value)}
+              required
+              disabled={loading}
+            />
+            <input
+              type="text"
+              placeholder="Name"
+              value={customer.name}
+              onChange={(e) => updateCustomer(index, 'name', e.target.value)}
+              required
+              disabled={loading}
+            />
+            {customers.length > 1 && (
+              <button type="button" onClick={() => removeCustomer(index)} disabled={loading} className="remove-btn">
+                ✕
+              </button>
+            )}
+          </div>
+        ))}
+        <button type="button" onClick={addCustomer} disabled={loading} className="add-btn">
+          + Add Customer
+        </button>
         <select
           value={configId}
           onChange={(e) => setConfigId(e.target.value)}
@@ -80,16 +136,23 @@ const SendTemplate = () => {
             </option>
           ))}
         </select>
-        <button type="submit" disabled={loading}>
-          {loading ? 'Sending...' : 'Send Template'}
+        <button type="submit" disabled={loading} className="send-btn">
+          {loading ? 'Sending...' : 'Send Templates'}
         </button>
       </form>
 
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>{modalMessage.includes('Error') ? '❌ Error' : '✅ Success'}</h3>
-            <p>{modalMessage}</p>
+            <h3>Send Results</h3>
+            <div className="results">
+              {results.map((result, i) => (
+                <div key={i} className={`result-item ${result.status}`}>
+                  {result.status === 'success' ? '✅' : '❌'} {result.name} ({result.phoneNumber})
+                  {result.error && <div className="error-msg">{result.error}</div>}
+                </div>
+              ))}
+            </div>
             <button onClick={() => setShowModal(false)}>Close</button>
           </div>
         </div>

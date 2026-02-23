@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('ffmpeg-static');
+const XLSX = require('xlsx');
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
@@ -80,9 +81,25 @@ const uploadMediaToWhatsApp = async (mediaUrl, phoneNumberId, accessToken) => {
   }
 };
 
+const normalizePhoneNumber = (phone) => {
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 10) {
+    return '91' + cleaned;
+  }
+  return cleaned;
+};
+
 const sendConfiguredTemplate = async (req, res) => {
   try {
-    const { phoneNumber, name, configId } = req.body;
+    const { customers, configId, campaign } = req.body;
+    
+    if (!customers || !Array.isArray(customers) || customers.length === 0) {
+      return res.status(400).json({ error: 'Customers array is required' });
+    }
+    
+    if (!campaign) {
+      return res.status(400).json({ error: 'Campaign name is required' });
+    }
     
     let config;
     if (configId) {
@@ -95,67 +112,81 @@ const sendConfiguredTemplate = async (req, res) => {
       return res.status(404).json({ error: 'Template configuration not found' });
     }
     
-    const message = {
-      messaging_product: 'whatsapp',
-      to: phoneNumber,
-      type: 'template',
-      template: {
-        name: config.templateName,
-        language: { code: config.templateLanguage }
-      }
-    };
+    const results = [];
     
-    if (config.headerMedia && config.headerMediaType) {
-      const mediaType = config.headerMediaType.toLowerCase();
+    for (const customer of customers) {
+      let { phoneNumber, name } = customer;
+      phoneNumber = normalizePhoneNumber(phoneNumber);
       
-      // Upload media to WhatsApp and get media ID
-      let mediaId;
       try {
-        mediaId = await uploadMediaToWhatsApp(config.headerMedia, config.phoneNumberId, config.accessToken);
-        console.log('Media uploaded to WhatsApp, ID:', mediaId);
-      } catch (uploadError) {
-        console.error('Failed to upload media, sending without header');
-      }
-      
-      if (mediaId) {
-        message.template.components = [
-          {
-            type: 'header',
-            parameters: [
-              {
-                type: mediaType,
-                [mediaType]: {
-                  id: mediaId
-                }
-              }
-            ]
+        const message = {
+          messaging_product: 'whatsapp',
+          to: phoneNumber,
+          type: 'template',
+          template: {
+            name: config.templateName,
+            language: { code: config.templateLanguage }
           }
-        ];
+        };
+        
+        if (config.headerMedia && config.headerMediaType) {
+          const mediaType = config.headerMediaType.toLowerCase();
+          
+          try {
+            const mediaId = await uploadMediaToWhatsApp(config.headerMedia, config.phoneNumberId, config.accessToken);
+            message.template.components = [
+              {
+                type: 'header',
+                parameters: [
+                  {
+                    type: mediaType,
+                    [mediaType]: { id: mediaId }
+                  }
+                ]
+              }
+            ];
+          } catch (uploadError) {
+            console.error('Failed to upload media for', phoneNumber);
+          }
+        }
+        
+        await axios.post(
+          `https://graph.facebook.com/v21.0/${config.phoneNumberId}/messages`,
+          message,
+          {
+            headers: {
+              'Authorization': `Bearer ${config.accessToken}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        
+        await prisma.customer.create({
+          data: {
+            name,
+            phoneNumber,
+            campaign,
+            status: 'sent',
+            sentAt: new Date()
+          }
+        });
+        
+        results.push({ phoneNumber, name, status: 'success' });
+        console.log(`Template sent to ${phoneNumber} (${name}) - Campaign: ${campaign}`);
+      } catch (error) {
+        results.push({ phoneNumber, name, status: 'failed', error: error.message });
+        console.error(`Failed to send to ${phoneNumber}:`, error.message);
       }
-    } else if (!config.headerMedia) {
-      console.log('Sending template without header media');
     }
     
-    const response = await axios.post(
-      `https://graph.facebook.com/v21.0/${config.phoneNumberId}/messages`,
-      message,
-      {
-        headers: {
-          'Authorization': `Bearer ${config.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-    
-    console.log(`Template sent to ${phoneNumber} (${name}) using config: ${config.configName}`);
-    
     res.json({ 
-      message: 'Template sent successfully', 
-      data: response.data,
-      config: config.configName 
+      message: 'Templates processed', 
+      results,
+      config: config.configName,
+      campaign 
     });
   } catch (error) {
-    console.error('Error sending template:', error.response?.data || error.message);
+    console.error('Error sending templates:', error.response?.data || error.message);
     res.status(500).json({ error: error.response?.data || error.message });
   }
 };
@@ -172,4 +203,45 @@ const getAvailableConfigs = async (req, res) => {
   }
 };
 
-module.exports = { sendConfiguredTemplate, getAvailableConfigs };
+const bulkUploadCustomers = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Excel file is required' });
+    }
+    
+    const workbook = XLSX.readFile(req.file.path);
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(sheet);
+    
+    const customers = data.map(row => {
+      const keys = Object.keys(row);
+      const nameKey = keys.find(k => k.trim().toLowerCase() === 'name');
+      const phoneKey = keys.find(k => k.trim().toLowerCase() === 'phone');
+      
+      const phoneNumber = normalizePhoneNumber(String(row[phoneKey] || ''));
+      const name = String(row[nameKey] || '').trim();
+      return { phoneNumber, name };
+    }).filter(c => c.phoneNumber && c.name);
+    
+    fs.unlinkSync(req.file.path);
+    
+    res.json({ customers, count: customers.length });
+  } catch (error) {
+    console.error('Error parsing Excel:', error);
+    res.status(500).json({ error: 'Failed to parse Excel file' });
+  }
+};
+
+const getCustomers = async (req, res) => {
+  try {
+    const customers = await prisma.customer.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(customers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports = { sendConfiguredTemplate, getAvailableConfigs, bulkUploadCustomers, getCustomers };

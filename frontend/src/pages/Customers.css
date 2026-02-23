@@ -32,3 +32,20 @@ tbody tr:hover {
 tbody tr:not(:last-child) {
   border-bottom: 1px solid var(--border-color);
 }
+
+.status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.status.sent {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status.failed {
+  background: #f8d7da;
+  color: #721c24;
+}
