@@ -85,16 +85,25 @@ const webhookPost = async (req, res) => {
     const userInput = message.text.body.trim();
     console.log('From:', from, 'Input:', userInput);
 
-    const [rows] = await db.execute(
+    let [rows] = await db.execute(
       'SELECT id, Name, MobileNo, DOB, DOA FROM customer WHERE (MobileNo = ? OR MobileNo = ?) AND IsActive = ?',
       [from, mobileNoWithout91, 'Y']
     );
 
     console.log('Customer found:', rows.length > 0);
     
+    // If customer not found, create new customer
     if (rows.length === 0) {
-      console.log('No customer found for:', from, 'or', mobileNoWithout91);
-      return res.sendStatus(200);
+      console.log('Creating new customer for:', mobileNoWithout91);
+      await db.execute(
+        'INSERT INTO customer (MobileNo, IsActive) VALUES (?, ?)',
+        [mobileNoWithout91, 'Y']
+      );
+      // Fetch the newly created customer
+      [rows] = await db.execute(
+        'SELECT id, Name, MobileNo, DOB, DOA FROM customer WHERE MobileNo = ?',
+        [mobileNoWithout91]
+      );
     }
 
     const customer = rows[0];
@@ -103,6 +112,10 @@ const webhookPost = async (req, res) => {
     console.log('Current state:', state?.step);
 
     if (!state) {
+      conversationState.set(dbMobileNo, { step: 'awaiting_name' });
+      await sendTextMessage(from, 'Welcome! Please enter your name:');
+    } else if (state.step === 'awaiting_name') {
+      await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
       conversationState.set(dbMobileNo, { step: 'awaiting_dob' });
       await sendTextMessage(from, 'Please enter your Date of Birth (DD-MM-YYYY):');
     } else if (state.step === 'awaiting_dob') {
@@ -121,18 +134,6 @@ const webhookPost = async (req, res) => {
         const dbFormat = `${year}-${month}-${day}`;
         await db.execute('UPDATE customer SET DOA = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
       }
-      conversationState.set(dbMobileNo, { step: 'awaiting_name_confirmation' });
-      await sendTextMessage(from, `Want to update name? Already you have name "${customer.Name}". Is this valid name or if you want to change type "Yes"`);
-    } else if (state.step === 'awaiting_name_confirmation') {
-      if (userInput.toLowerCase() === 'yes') {
-        conversationState.set(dbMobileNo, { step: 'awaiting_new_name' });
-        await sendTextMessage(from, 'Please enter your name:');
-      } else {
-        await sendTextMessage(from, 'நன்றி! உங்கள் தகவல் வெற்றிகரமாக சேமிக்கப்பட்டது. 🎉');
-        conversationState.delete(dbMobileNo);
-      }
-    } else if (state.step === 'awaiting_new_name') {
-      await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
       await sendTextMessage(from, 'நன்றி! உங்கள் தகவல் வெற்றிகரமாக சேமிக்கப்பட்டது. 🎉');
       conversationState.delete(dbMobileNo);
     }
