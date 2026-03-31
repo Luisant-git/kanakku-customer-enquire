@@ -8,7 +8,7 @@ const api = axios.create({
 });
 
 export const getCustomers = async (page = 1, limit = 10, search = '') => {
-  const response = await api.get('/api/campaign-customers', {
+  const response = await api.get('/api/customers', {
     params: { page, limit, search }
   });
   return response.data;

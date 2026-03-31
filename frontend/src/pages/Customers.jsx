@@ -35,7 +35,7 @@ const Customers = () => {
       <div className="page-header">
         <div>
           <h2><FiUsers /> Customers</h2>
-          <p>View all customers who received template messages</p>
+          <p>View all customers from your database</p>
         </div>
         <div className="search-box">
           <FiSearch className="search-icon" />
@@ -55,27 +55,27 @@ const Customers = () => {
             <tr>
               <th>Name</th>
               <th>Phone Number</th>
-              <th>Campaign</th>
+              <th>Date of Birth</th>
+              <th>Anniversary</th>
               <th>Status</th>
-              <th>Sent At</th>
-              <th>Created At</th>
+              <th>ID</th>
             </tr>
           </thead>
           <tbody>
             {customers.length > 0 ? (
               customers.map((customer) => (
                 <tr key={customer.id}>
-                  <td>{customer.name}</td>
-                  <td>{customer.phoneNumber}</td>
-                  <td><span className="campaign-badge">{customer.campaign}</span></td>
+                  <td>{customer.Name}</td>
+                  <td>{customer.MobileNo}</td>
+                  <td>{customer.DOB ? new Date(customer.DOB).toLocaleDateString() : '-'}</td>
+                  <td>{customer.DOA ? new Date(customer.DOA).toLocaleDateString() : '-'}</td>
                   <td>
-                    <span className={`status-badge ${customer.status}`}>
-                      {customer.status === 'sent' ? <BsCheckCircle /> : <BsXCircle />}
-                      {customer.status}
+                    <span className={`status-badge ${customer.IsActive === 'Y' ? 'sent' : 'failed'}`}>
+                      {customer.IsActive === 'Y' ? <BsCheckCircle /> : <BsXCircle />}
+                      {customer.IsActive === 'Y' ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td>{customer.sentAt ? new Date(customer.sentAt).toLocaleString() : '-'}</td>
-                  <td>{customer.createdAt ? new Date(customer.createdAt).toLocaleString() : '-'}</td>
+                  <td>{customer.id}</td>
                 </tr>
               ))
             ) : (
