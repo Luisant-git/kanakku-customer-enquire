@@ -24,28 +24,6 @@ const sendWhatsAppMessage = async (to, message) => {
   }
 };
 
-const sendTemplateMessage = async (to, billNo, amount) => {
-  const message = {
-    messaging_product: 'whatsapp',
-    to: to,
-    type: 'template',
-    template: {
-      name: process.env.TEMPLATE_ID,
-      language: { code: 'en' },
-      components: [
-        {
-          type: 'body',
-          parameters: [
-            { type: 'text', text: billNo },
-            { type: 'text', text: amount }
-          ]
-        }
-      ]
-    }
-  };
-  console.log('Sending template to:', to, 'Message:', JSON.stringify(message));
-  await sendWhatsAppMessage(to, message);
-};
 
 const sendTextMessage = async (to, text) => {
   const message = {
