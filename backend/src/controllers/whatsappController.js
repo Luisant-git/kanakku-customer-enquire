@@ -153,7 +153,10 @@ const webhookPost = async (req, res) => {
     // Check if customer already has all information
     if (!state && customer.Name && customer.DOB && customer.DOA) {
       conversationState.set(dbMobileNo, { step: 'awaiting_name_update_confirmation' });
-      await sendTextMessage(from, `Welcome back ${customer.Name}! Want to update name? Already you have name "${customer.Name}". If you want to change type "Yes" otherwise type "No"`);
+      const dobDisplay = customer.DOB ? new Date(customer.DOB).toLocaleDateString('en-GB').replace(/\//g, '-') : 'Not set';
+      await sendTextMessage(from, `Welcome back ${customer.Name}! Your Date of Birth is ${dobDisplay}. 
+      
+Want to update name? Already you have name "${customer.Name}". If you want to change type "Yes" otherwise type "No"`);
       return res.sendStatus(200);
     }
 
@@ -174,32 +177,12 @@ const webhookPost = async (req, res) => {
         conversationState.set(dbMobileNo, { step: 'awaiting_name_update' });
         await sendTextMessage(from, 'Please enter your new name:');
       } else {
-        conversationState.set(dbMobileNo, { step: 'awaiting_dob_update_confirmation' });
-        const dobDisplay = customer.DOB ? new Date(customer.DOB).toLocaleDateString('en-GB').replace(/\//g, '-') : 'Not set';
-        await sendTextMessage(from, `Want to update Date of Birth? Already you have DOB "${dobDisplay}". If you want to change type "Yes" otherwise type "No"`);
-      }
-    } else if (state.step === 'awaiting_name_update') {
-      await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
-      conversationState.set(dbMobileNo, { step: 'awaiting_dob_update_confirmation' });
-      const [updatedRows] = await db.execute('SELECT DOB FROM customer WHERE MobileNo = ?', [dbMobileNo]);
-      const dobDisplay = updatedRows[0].DOB ? new Date(updatedRows[0].DOB).toLocaleDateString('en-GB').replace(/\//g, '-') : 'Not set';
-      await sendTextMessage(from, `Want to update Date of Birth? Already you have DOB "${dobDisplay}". If you want to change type "Yes" otherwise type "No"`);
-    } else if (state.step === 'awaiting_dob_update_confirmation') {
-      if (userInput.toLowerCase() === 'yes') {
-        conversationState.set(dbMobileNo, { step: 'awaiting_dob_update' });
-        await sendTextMessage(from, 'Please enter your new Date of Birth (DD-MM-YYYY):');
-      } else {
         conversationState.set(dbMobileNo, { step: 'awaiting_doa_update_confirmation' });
         const doaDisplay = customer.DOA ? new Date(customer.DOA).toLocaleDateString('en-GB').replace(/\//g, '-') : 'Not set';
         await sendTextMessage(from, `Want to update Date of Anniversary? Already you have DOA "${doaDisplay}". If you want to change type "Yes" otherwise type "No"`);
       }
-    } else if (state.step === 'awaiting_dob_update') {
-      const dobRegex = /^\d{2}-\d{2}-\d{4}$/;
-      if (dobRegex.test(userInput)) {
-        const [day, month, year] = userInput.split('-');
-        const dbFormat = `${year}-${month}-${day}`;
-        await db.execute('UPDATE customer SET DOB = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
-      }
+    } else if (state.step === 'awaiting_name_update') {
+      await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
       conversationState.set(dbMobileNo, { step: 'awaiting_doa_update_confirmation' });
       const [updatedRows] = await db.execute('SELECT DOA FROM customer WHERE MobileNo = ?', [dbMobileNo]);
       const doaDisplay = updatedRows[0].DOA ? new Date(updatedRows[0].DOA).toLocaleDateString('en-GB').replace(/\//g, '-') : 'Not set';
