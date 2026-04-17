@@ -61,8 +61,8 @@ const sendCompletionMessages = async (to, dbMobileNo) => {
   try {
     await sendTextMessage(to, 'நன்றி! உங்கள் தகவல் வெற்றிகரமாக சேமிக்கப்பட்டது. 🎉');
     
-    const link1 = 'https://teams.live.com/l/message/19:uni01_xb5cbdq733sqonfzxfrdm25clp4iy6kqflv23khe5ug73y2okpfq@thread.v2/1776405246627?context=%7B%22contextType%22%3A%22chat%22%7D';
-    const link2 = 'https://teams.live.com/l/message/19:uni01_xb5cbdq733sqonfzxfrdm25clp4iy6kqflv23khe5ug73y2okpfq@thread.v2/1776405293660?context=%7B%22contextType%22%3A%22chat%22%7D';
+    const link1 = 'https://www.instagram.com/magalirmattum.official?igsh=Mzl6cjlvYmRrd2g4';
+    const link2 = 'https://www.instagram.com/rathnavilas?igsh=MWMwNGFkdmwxdW9lNg==';
     
     // WhatsApp button text limit is 20 characters. 
     // Using shortened text to ensure it fits the API constraints.
