@@ -65,8 +65,8 @@ const sendCompletionMessages = async (to, dbMobileNo) => {
     const link2 = 'https://www.instagram.com/rathnavilas?igsh=MWMwNGFkdmwxdW9lNg==';
 
     await sendTextMessage(to, 'எங்களை தொடர்ந்து அறிய Instagram-ல் பின்தொடரவும் 👇');
-    await sendUrlButtonMessage(to, 'Magalir Mattum', link1);
-    await sendUrlButtonMessage(to, 'Rathna Vilas', link2);
+    await sendUrlButtonMessage(to, 'Magalir Mattum', 'Follow Link', link1);
+    await sendUrlButtonMessage(to, 'Rathna Vilas', 'Follow Link', link2);
 
     conversationState.delete(dbMobileNo);
   } catch (error) {
