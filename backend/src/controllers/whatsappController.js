@@ -36,6 +36,46 @@ const sendTextMessage = async (to, text) => {
 };
 
 
+const sendUrlButtonMessage = async (to, bodyText, buttonText, url) => {
+  const message = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: to,
+    type: 'interactive',
+    interactive: {
+      type: 'cta_url',
+      body: { text: bodyText },
+      action: {
+        name: 'cta_url',
+        parameters: {
+          display_text: buttonText,
+          url: url
+        }
+      }
+    }
+  };
+  await sendWhatsAppMessage(to, message);
+};
+
+const sendCompletionMessages = async (to, dbMobileNo) => {
+  try {
+    await sendTextMessage(to, 'நன்றி! உங்கள் தகவல் வெற்றிகரமாக சேமிக்கப்பட்டது. 🎉');
+    
+    const link1 = 'https://teams.live.com/l/message/19:uni01_xb5cbdq733sqonfzxfrdm25clp4iy6kqflv23khe5ug73y2okpfq@thread.v2/1776405246627?context=%7B%22contextType%22%3A%22chat%22%7D';
+    const link2 = 'https://teams.live.com/l/message/19:uni01_xb5cbdq733sqonfzxfrdm25clp4iy6kqflv23khe5ug73y2okpfq@thread.v2/1776405293660?context=%7B%22contextType%22%3A%22chat%22%7D';
+    
+    // WhatsApp button text limit is 20 characters. 
+    // Using shortened text to ensure it fits the API constraints.
+    await sendUrlButtonMessage(to, 'Instagram-ல் எங்களைப் பின்தொடரவும்:', 'Follow Link 1', link1);
+    await sendUrlButtonMessage(to, 'மேலதிக தகவலுக்கு:', 'Follow Link 2', link2);
+    
+    conversationState.delete(dbMobileNo);
+  } catch (error) {
+    console.error('Error in sendCompletionMessages:', error);
+  }
+};
+
+
 
 const webhookVerify = (req, res) => {
   const mode = req.query['hub.mode'];
@@ -170,8 +210,7 @@ const webhookPost = async (req, res) => {
         conversationState.set(dbMobileNo, { step: 'awaiting_doa_update' });
         await sendTextMessage(from, 'Please enter your new Date of Anniversary (DD-MM-YYYY):');
       } else {
-        await sendTextMessage(from, 'நன்றி! உங்கள் தகவல் வெற்றிகரமாக சேமிக்கப்பட்டது. 🎉');
-        conversationState.delete(dbMobileNo);
+        await sendCompletionMessages(from, dbMobileNo);
       }
     } else if (state.step === 'awaiting_doa_update') {
       const doaRegex = /^\d{2}-\d{2}-\d{4}$/;
@@ -180,8 +219,7 @@ const webhookPost = async (req, res) => {
         const dbFormat = `${year}-${month}-${day}`;
         await db.execute('UPDATE customer SET DOA = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
       }
-      await sendTextMessage(from, 'நன்றி! உங்கள் தகவல் வெற்றிகரமாக சேமிக்கப்பட்டது. 🎉');
-      conversationState.delete(dbMobileNo);
+      await sendCompletionMessages(from, dbMobileNo);
     } else if (state.step === 'awaiting_name') {
       await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
       conversationState.set(dbMobileNo, { step: 'awaiting_dob' });
@@ -202,8 +240,7 @@ const webhookPost = async (req, res) => {
         const dbFormat = `${year}-${month}-${day}`;
         await db.execute('UPDATE customer SET DOA = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
       }
-      await sendTextMessage(from, 'நன்றி! உங்கள் தகவல் வெற்றிகரமாக சேமிக்கப்பட்டது. 🎉');
-      conversationState.delete(dbMobileNo);
+      await sendCompletionMessages(from, dbMobileNo);
     }
 
     res.sendStatus(200);
