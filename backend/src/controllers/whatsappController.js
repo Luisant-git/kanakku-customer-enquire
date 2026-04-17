@@ -64,17 +64,9 @@ const sendCompletionMessages = async (to, dbMobileNo) => {
     const link1 = 'https://www.instagram.com/magalirmattum.official?igsh=Mzl6cjlvYmRrd2g4';
     const link2 = 'https://www.instagram.com/rathnavilas?igsh=MWMwNGFkdmwxdW9lNg==';
 
-    // await sendTextMessage(to, 'எங்களை தொடர்ந்து அறிய 👇');
-    // await sendUrlButtonMessage(to, 'Magalir Mattum:', 'Follow', link1);
-    // await sendUrlButtonMessage(to, 'Rathna Vilas:', 'Follow', link2);
-
-    await sendButtonMessage(to, {
-      text: 'எங்களை தொடர்ந்து அறிய, Instagram-ல் பின்தொடரவும் 👇',
-      buttons: [
-        { text: 'Magalir Mattum', url: link1 },
-        { text: 'Rathna Vilas', url: link2 }
-      ]
-    });
+    await sendTextMessage(to, 'எங்களை தொடர்ந்து அறிய 👇');
+    await sendUrlButtonMessage(to, 'Instagram-ல் பின்தொடரவும்:', 'Magalir Mattum', link1);
+    await sendUrlButtonMessage(to, 'Instagram-ல் பின்தொடரவும்:', 'Rathna Vilas', link2);
 
     conversationState.delete(dbMobileNo);
   } catch (error) {
