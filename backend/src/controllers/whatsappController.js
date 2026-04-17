@@ -66,8 +66,8 @@ const sendCompletionMessages = async (to, dbMobileNo) => {
     
     // WhatsApp button text limit is 20 characters. 
     // Using shortened text to ensure it fits the API constraints.
-    await sendUrlButtonMessage(to, 'Instagram-ல் எங்களைப் பின்தொடரவும்:', 'Follow Link 1', link1);
-    await sendUrlButtonMessage(to, 'மேலதிக தகவலுக்கு:', 'Follow Link 2', link2);
+    await sendUrlButtonMessage(to, 'Instagram-ல் பின்தொடரவும்:', 'Follow Link 1', link1);
+    await sendUrlButtonMessage(to, 'Instagram-ல் பின்தொடரவும்:', 'Follow Link 2', link2);
     
     conversationState.delete(dbMobileNo);
   } catch (error) {
