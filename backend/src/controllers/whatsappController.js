@@ -60,15 +60,22 @@ const sendUrlButtonMessage = async (to, bodyText, buttonText, url) => {
 const sendCompletionMessages = async (to, dbMobileNo) => {
   try {
     await sendTextMessage(to, 'நன்றி! உங்கள் தகவல் வெற்றிகரமாக சேமிக்கப்பட்டது. 🎉');
-    
+
     const link1 = 'https://www.instagram.com/magalirmattum.official?igsh=Mzl6cjlvYmRrd2g4';
     const link2 = 'https://www.instagram.com/rathnavilas?igsh=MWMwNGFkdmwxdW9lNg==';
-    
-    // WhatsApp button text limit is 20 characters. 
-    // Using shortened text to ensure it fits the API constraints.
-    await sendUrlButtonMessage(to, 'Instagram-ல் பின்தொடரவும்:', 'Follow Link 1', link1);
-    await sendUrlButtonMessage(to, 'Instagram-ல் பின்தொடரவும்:', 'Follow Link 2', link2);
-    
+
+    // await sendTextMessage(to, 'எங்களை தொடர்ந்து அறிய 👇');
+    // await sendUrlButtonMessage(to, 'Magalir Mattum:', 'Follow', link1);
+    // await sendUrlButtonMessage(to, 'Rathna Vilas:', 'Follow', link2);
+
+    await sendButtonMessage(to, {
+      text: 'எங்களை தொடர்ந்து அறிய, Instagram-ல் பின்தொடரவும் 👇',
+      buttons: [
+        { text: 'Magalir Mattum', url: link1 },
+        { text: 'Rathna Vilas', url: link2 }
+      ]
+    });
+
     conversationState.delete(dbMobileNo);
   } catch (error) {
     console.error('Error in sendCompletionMessages:', error);
@@ -96,7 +103,7 @@ const webhookVerify = (req, res) => {
 const webhookPost = async (req, res) => {
   try {
     console.log('Webhook received:', JSON.stringify(req.body));
-    
+
     const entry = req.body.entry?.[0];
     const change = entry?.changes?.[0];
     const message = change?.value?.messages?.[0];
@@ -107,7 +114,7 @@ const webhookPost = async (req, res) => {
     }
 
     console.log('Message type:', message.type);
-    
+
     if (message.type !== 'text') {
       console.log('Not a text message, ignoring');
       return res.sendStatus(200);
@@ -131,7 +138,7 @@ const webhookPost = async (req, res) => {
     );
 
     console.log('Customer found:', rows.length > 0);
-    
+
     // If customer not found, create new customer
     if (rows.length === 0) {
       console.log('Creating new customer for:', mobileNoWithout91);
