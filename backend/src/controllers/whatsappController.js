@@ -155,7 +155,7 @@ const webhookPost = async (req, res) => {
       conversationState.set(dbMobileNo, { step: 'awaiting_name_update_confirmation' });
       const dobDisplay = new Date(customer.DOB).toLocaleDateString('en-GB').replace(/\//g, '-');
       const doaDisplay = new Date(customer.DOA).toLocaleDateString('en-GB').replace(/\//g, '-');
-      await sendTextMessage(from, `Welcome back ${customer.Name}!\n\n🎂 Date of Birth: ${dobDisplay}\n💍 Date of Anniversary: ${doaDisplay}\n\nWant to update name? Already you have name "${customer.Name}". If you want to change type "Yes" otherwise type "No"`);
+      await sendTextMessage(from, `Welcome back ${customer.Name}!\n\nDate of Birth: ${dobDisplay}\nDate of Anniversary: ${doaDisplay}\n\nWant to update name? Already you have name "${customer.Name}". If you want to change type "Yes" otherwise type "No"`);
       return res.sendStatus(200);
     }
 
