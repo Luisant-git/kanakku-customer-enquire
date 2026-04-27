@@ -153,10 +153,9 @@ const webhookPost = async (req, res) => {
     // Check if customer already has all information
     if (!state && customer.Name && customer.DOB && customer.DOA) {
       conversationState.set(dbMobileNo, { step: 'awaiting_name_update_confirmation' });
-      const dobDisplay = customer.DOB ? new Date(customer.DOB).toLocaleDateString('en-GB').replace(/\//g, '-') : 'Not set';
-      await sendTextMessage(from, `Welcome back ${customer.Name}! Your Date of Birth is ${dobDisplay}. 
-      
-Want to update name? Already you have name "${customer.Name}". If you want to change type "Yes" otherwise type "No"`);
+      const dobDisplay = new Date(customer.DOB).toLocaleDateString('en-GB').replace(/\//g, '-');
+      const doaDisplay = new Date(customer.DOA).toLocaleDateString('en-GB').replace(/\//g, '-');
+      await sendTextMessage(from, `Welcome back ${customer.Name}!\n\n🎂 Date of Birth: ${dobDisplay}\n💍 Date of Anniversary: ${doaDisplay}\n\nWant to update name? Already you have name "${customer.Name}". If you want to change type "Yes" otherwise type "No"`);
       return res.sendStatus(200);
     }
 
