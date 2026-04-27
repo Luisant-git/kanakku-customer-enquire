@@ -177,30 +177,10 @@ Want to update name? Already you have name "${customer.Name}". If you want to ch
         conversationState.set(dbMobileNo, { step: 'awaiting_name_update' });
         await sendTextMessage(from, 'Please enter your new name:');
       } else {
-        conversationState.set(dbMobileNo, { step: 'awaiting_doa_update_confirmation' });
-        const doaDisplay = customer.DOA ? new Date(customer.DOA).toLocaleDateString('en-GB').replace(/\//g, '-') : 'Not set';
-        await sendTextMessage(from, `Want to update Date of Anniversary? Already you have DOA "${doaDisplay}". If you want to change type "Yes" otherwise type "No"`);
+        await sendCompletionMessages(from, dbMobileNo);
       }
     } else if (state.step === 'awaiting_name_update') {
       await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
-      conversationState.set(dbMobileNo, { step: 'awaiting_doa_update_confirmation' });
-      const [updatedRows] = await db.execute('SELECT DOA FROM customer WHERE MobileNo = ?', [dbMobileNo]);
-      const doaDisplay = updatedRows[0].DOA ? new Date(updatedRows[0].DOA).toLocaleDateString('en-GB').replace(/\//g, '-') : 'Not set';
-      await sendTextMessage(from, `Want to update Date of Anniversary? Already you have DOA "${doaDisplay}". If you want to change type "Yes" otherwise type "No"`);
-    } else if (state.step === 'awaiting_doa_update_confirmation') {
-      if (userInput.toLowerCase() === 'yes') {
-        conversationState.set(dbMobileNo, { step: 'awaiting_doa_update' });
-        await sendTextMessage(from, 'Please enter your new Date of Anniversary (DD-MM-YYYY):');
-      } else {
-        await sendCompletionMessages(from, dbMobileNo);
-      }
-    } else if (state.step === 'awaiting_doa_update') {
-      const doaRegex = /^\d{2}-\d{2}-\d{4}$/;
-      if (doaRegex.test(userInput)) {
-        const [day, month, year] = userInput.split('-');
-        const dbFormat = `${year}-${month}-${day}`;
-        await db.execute('UPDATE customer SET DOA = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
-      }
       await sendCompletionMessages(from, dbMobileNo);
     } else if (state.step === 'awaiting_name') {
       await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
@@ -212,17 +192,21 @@ Want to update name? Already you have name "${customer.Name}". If you want to ch
         const [day, month, year] = userInput.split('-');
         const dbFormat = `${year}-${month}-${day}`;
         await db.execute('UPDATE customer SET DOB = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
+        conversationState.set(dbMobileNo, { step: 'awaiting_doa' });
+        await sendTextMessage(from, 'Please enter your Date of Anniversary (DD-MM-YYYY):');
+      } else {
+        await sendTextMessage(from, 'Invalid format! Please enter Date of Birth in DD-MM-YYYY format (e.g., 15-08-1990):');
       }
-      conversationState.set(dbMobileNo, { step: 'awaiting_doa' });
-      await sendTextMessage(from, 'Please enter your Date of Anniversary (DD-MM-YYYY):');
     } else if (state.step === 'awaiting_doa') {
       const doaRegex = /^\d{2}-\d{2}-\d{4}$/;
       if (doaRegex.test(userInput)) {
         const [day, month, year] = userInput.split('-');
         const dbFormat = `${year}-${month}-${day}`;
         await db.execute('UPDATE customer SET DOA = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
+        await sendCompletionMessages(from, dbMobileNo);
+      } else {
+        await sendTextMessage(from, 'Invalid format! Please enter Date of Anniversary in DD-MM-YYYY format (e.g., 20-06-2015):');
       }
-      await sendCompletionMessages(from, dbMobileNo);
     }
 
     res.sendStatus(200);
