@@ -106,7 +106,8 @@ const webhookPost = async (req, res) => {
       // so you can see it there, BUT we do NOT return early, so your Enquiry chatbot
       // will still process the message normally and reply to the customer!
       axios.post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body)
-        .catch(err => console.error('Failed to forward to Whatsapp Dashboard:', err.message));
+        .then(response => console.log('✅ Forwarded to Whatsapp Dashboard! Status:', response.status))
+        .catch(err => console.error('❌ Failed to forward to Whatsapp Dashboard:', err.message));
     }
 
     console.log('Webhook received:', JSON.stringify(req.body));
