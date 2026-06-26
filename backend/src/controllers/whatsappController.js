@@ -101,18 +101,12 @@ const webhookPost = async (req, res) => {
       const change = entry?.changes?.[0];
       const phoneNumberId = change?.value?.metadata?.phone_number_id;
       
-      // 🚦 DYNAMIC TRAFFIC COP
-      // Check if this message belongs to the Enquiry system's own phone number.
-      // If it doesn't, it must belong to one of the tenants on the Whatsapp Campaign website!
-      if (phoneNumberId && phoneNumberId !== process.env.PHONE_NUMBER_ID) {
-        console.log(`Forwarding message (Phone ID: ${phoneNumberId}) to Whatsapp Campaign Multi-Tenant System...`);
-        
-        // Forward to the CATCH-ALL route (No hardcoded verify tokens needed!)
-        // The Whatsapp backend will automatically figure out which tenant it belongs to.
-        await axios.post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body);
-        
-        return res.status(200).send('EVENT_RECEIVED');
-      }
+      // 🚦 FORWARD A COPY TO WHATSAPP CAMPAIGN DASHBOARD
+      // This sends a copy of the message to your new Whatsapp Multi-Tenant dashboard
+      // so you can see it there, BUT we do NOT return early, so your Enquiry chatbot
+      // will still process the message normally and reply to the customer!
+      axios.post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body)
+        .catch(err => console.error('Failed to forward to Whatsapp Dashboard:', err.message));
     }
 
     console.log('Webhook received:', JSON.stringify(req.body));
