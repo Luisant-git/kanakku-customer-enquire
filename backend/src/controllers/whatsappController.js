@@ -101,18 +101,18 @@ const webhookPost = async (req, res) => {
       const change = entry?.changes?.[0];
       const phoneNumberId = change?.value?.metadata?.phone_number_id;
       
-      // 🚦 THE TRAFFIC COP LOGIC
-      // If the message is for the new Whatsapp Project (Rathna Vilas)
-      if (phoneNumberId === '102588026101837') {
-        console.log('Forwarding webhook to Whatsapp Project...');
+      // 🚦 DYNAMIC TRAFFIC COP
+      // Check if this message belongs to the Enquiry system's own phone number.
+      // If it doesn't, it must belong to one of the tenants on the Whatsapp Campaign website!
+      if (phoneNumberId && phoneNumberId !== process.env.PHONE_NUMBER_ID) {
+        console.log(`Forwarding message (Phone ID: ${phoneNumberId}) to Whatsapp Campaign Multi-Tenant System...`);
         
-        // Forward the exact same body to the new backend
-        await axios.post('https://whatsapp.api.luisant.cloud/whatsapp/webhook/rathna_vilas_whatsapp_webhook_verify_token', body);
+        // Forward to the CATCH-ALL route (No hardcoded verify tokens needed!)
+        // The Whatsapp backend will automatically figure out which tenant it belongs to.
+        await axios.post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body);
         
-        // Return early so the Enquiry system ignores this message
-        return res.status(200).send('EVENT_RECEIVED'); 
+        return res.status(200).send('EVENT_RECEIVED');
       }
-    }
 
     console.log('Webhook received:', JSON.stringify(req.body));
 
