@@ -94,6 +94,26 @@ const webhookVerify = (req, res) => {
 
 const webhookPost = async (req, res) => {
   try {
+    const body = req.body;
+    
+    if (body && body.object === 'whatsapp_business_account') {
+      const entry = body.entry?.[0];
+      const change = entry?.changes?.[0];
+      const phoneNumberId = change?.value?.metadata?.phone_number_id;
+      
+      // 🚦 THE TRAFFIC COP LOGIC
+      // If the message is for the new Whatsapp Project (Rathna Vilas)
+      if (phoneNumberId === '102588026101837') {
+        console.log('Forwarding webhook to Whatsapp Project...');
+        
+        // Forward the exact same body to the new backend
+        await axios.post('https://whatsapp.api.luisant.cloud/whatsapp/webhook/rathna_vilas_whatsapp_webhook_verify_token', body);
+        
+        // Return early so the Enquiry system ignores this message
+        return res.status(200).send('EVENT_RECEIVED'); 
+      }
+    }
+
     console.log('Webhook received:', JSON.stringify(req.body));
 
     const entry = req.body.entry?.[0];
