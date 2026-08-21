@@ -57,9 +57,14 @@ const getAllCustomers = async (req, res) => {
     }
     
     if (dob) {
-      query += ' AND DATE(DOB) = ?';
-      countQuery += ' AND DATE(DOB) = ?';
-      params.push(dob);
+      if (dob === 'has_dob') {
+        query += ' AND DOB IS NOT NULL AND DOB != ""';
+        countQuery += ' AND DOB IS NOT NULL AND DOB != ""';
+      } else {
+        query += ' AND DATE(DOB) = ?';
+        countQuery += ' AND DATE(DOB) = ?';
+        params.push(dob);
+      }
     }
     
     // Sort by id descending to show newest first

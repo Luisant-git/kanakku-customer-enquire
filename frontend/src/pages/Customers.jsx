@@ -55,13 +55,15 @@ const Customers = () => {
             />
           </div>
           <div className="search-box date-filter">
-            <input
-              type="date"
+            <select
               value={dob}
               onChange={handleDobChange}
               className="search-input"
-              title="Filter by Date of Birth"
-            />
+              title="Filter by Date of Birth status"
+            >
+              <option value="">All Customers</option>
+              <option value="has_dob">Has Date of Birth</option>
+            </select>
           </div>
         </div>
       </div>
