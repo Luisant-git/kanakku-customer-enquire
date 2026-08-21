@@ -43,7 +43,7 @@ const createCustomer = async (req, res) => {
 // GET - Get all customers with pagination and search
 const getAllCustomers = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '' } = req.query;
+    const { page = 1, limit = 10, search = '', dob = '' } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     
     let query = 'SELECT * FROM customer WHERE IsActive = ?';
@@ -54,6 +54,12 @@ const getAllCustomers = async (req, res) => {
       query += ' AND (Name LIKE ? OR MobileNo LIKE ?)';
       countQuery += ' AND (Name LIKE ? OR MobileNo LIKE ?)';
       params.push(`%${search}%`, `%${search}%`);
+    }
+    
+    if (dob) {
+      query += ' AND DATE(DOB) = ?';
+      countQuery += ' AND DATE(DOB) = ?';
+      params.push(dob);
     }
     
     // Sort by id descending to show newest first

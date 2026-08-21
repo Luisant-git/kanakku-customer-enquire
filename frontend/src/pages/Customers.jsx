@@ -9,15 +9,16 @@ const Customers = () => {
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
   const [search, setSearch] = useState('');
+  const [dob, setDob] = useState('');
   const [pagination, setPagination] = useState({ total: 0, totalPages: 0 });
 
   useEffect(() => {
     fetchCustomers();
-  }, [page, search]);
+  }, [page, search, dob]);
 
   const fetchCustomers = async () => {
     try {
-      const data = await getCustomers(page, limit, search);
+      const data = await getCustomers(page, limit, search, dob);
       setCustomers(data.customers);
       setPagination(data.pagination);
     } catch (error) {
@@ -30,6 +31,11 @@ const Customers = () => {
     setPage(1);
   };
 
+  const handleDobChange = (e) => {
+    setDob(e.target.value);
+    setPage(1);
+  };
+
   return (
     <div className="customers">
       <div className="page-header">
@@ -37,15 +43,26 @@ const Customers = () => {
           <h2><FiUsers /> Customers</h2>
           <p>View all customers from your database</p>
         </div>
-        <div className="search-box">
-          <FiSearch className="search-icon" />
-          <input
-            type="text"
-            placeholder="Search by name, phone, or campaign..."
-            value={search}
-            onChange={handleSearch}
-            className="search-input"
-          />
+        <div className="filters-container">
+          <div className="search-box">
+            <FiSearch className="search-icon" />
+            <input
+              type="text"
+              placeholder="Search by name, phone, or campaign..."
+              value={search}
+              onChange={handleSearch}
+              className="search-input"
+            />
+          </div>
+          <div className="search-box date-filter">
+            <input
+              type="date"
+              value={dob}
+              onChange={handleDobChange}
+              className="search-input"
+              title="Filter by Date of Birth"
+            />
+          </div>
         </div>
       </div>
 

@@ -7,9 +7,9 @@ const api = axios.create({
   withCredentials: true
 });
 
-export const getCustomers = async (page = 1, limit = 10, search = '') => {
+export const getCustomers = async (page = 1, limit = 10, search = '', dob = '') => {
   const response = await api.get('/api/customers', {
-    params: { page, limit, search }
+    params: { page, limit, search, dob }
   });
   return response.data;
 };
