@@ -76,6 +76,14 @@ const sendCompletionMessages = async (to, dbMobileNo) => {
 
 
 
+// Ensure the processed_messages table exists for persistent idempotency
+db.execute(`
+  CREATE TABLE IF NOT EXISTS processed_messages (
+    message_id VARCHAR(255) PRIMARY KEY,
+    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )
+`).catch(err => console.error('Error creating processed_messages table:', err));
+
 const webhookVerify = (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -96,23 +104,11 @@ const webhookPost = async (req, res) => {
   try {
     const body = req.body;
     
-    if (body && body.object === 'whatsapp_business_account') {
-      const entry = body.entry?.[0];
-      const change = entry?.changes?.[0];
-      const phoneNumberId = change?.value?.metadata?.phone_number_id;
-      
-      // 🚦 FORWARD A COPY TO WHATSAPP CAMPAIGN DASHBOARD
-      // This sends a copy of the message to your new Whatsapp Multi-Tenant dashboard
-      // so you can see it there, BUT we do NOT return early, so your Enquiry chatbot
-      // will still process the message normally and reply to the customer!
-      axios.post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body)
-        .then(response => console.log('✅ Forwarded to Whatsapp Dashboard! Status:', response.status))
-        .catch(err => console.error('❌ Failed to forward to Whatsapp Dashboard:', err.message));
+    if (!body || body.object !== 'whatsapp_business_account') {
+      return res.sendStatus(200);
     }
 
-    console.log('Webhook received:', JSON.stringify(req.body));
-
-    const entry = req.body.entry?.[0];
+    const entry = body.entry?.[0];
     const change = entry?.changes?.[0];
     const message = change?.value?.messages?.[0];
 
@@ -121,19 +117,42 @@ const webhookPost = async (req, res) => {
       return res.sendStatus(200);
     }
 
+    // 1. Fast in-memory check
+    if (processedMessageIds.has(message.id)) {
+      console.log('Memory idempotency hit: Message already processed:', message.id);
+      return res.sendStatus(200);
+    }
+
+    // 2. Persistent database-level idempotency check
+    try {
+      await db.execute('INSERT INTO processed_messages (message_id) VALUES (?)', [message.id]);
+    } catch (err) {
+      if (err.code === 'ER_DUP_ENTRY') {
+        console.log('Database idempotency hit: Message already processed:', message.id);
+        processedMessageIds.add(message.id); // keep memory synced
+        return res.sendStatus(200);
+      }
+      // If it's another DB error, throw it so we don't accidentally process a message
+      // when the database is unreachable or having issues.
+      throw err;
+    }
+
+    processedMessageIds.add(message.id);
+
+    // 2. FORWARD A COPY TO WHATSAPP CAMPAIGN DASHBOARD
+    // This sends a copy of the message to your new Whatsapp Multi-Tenant dashboard
+    // It is deliberately NOT awaited (using .catch instead) so it doesn't block the enquiry flow.
+    axios.post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body)
+      .then(response => console.log('✅ Forwarded to Whatsapp Dashboard! Status:', response.status))
+      .catch(err => console.error('❌ Failed to forward to Whatsapp Dashboard:', err.message));
+
+    console.log('Webhook received for message:', message.id);
     console.log('Message type:', message.type);
 
     if (message.type !== 'text') {
       console.log('Not a text message, ignoring');
       return res.sendStatus(200);
     }
-
-    // Check if message already processed
-    if (processedMessageIds.has(message.id)) {
-      console.log('Message already processed:', message.id);
-      return res.sendStatus(200);
-    }
-    processedMessageIds.add(message.id);
 
     const from = message.from;
     const mobileNoWithout91 = from.startsWith('91') ? from.substring(2) : from;
@@ -166,61 +185,97 @@ const webhookPost = async (req, res) => {
     const state = conversationState.get(dbMobileNo);
     console.log('Current state:', state?.step);
 
-    // Check if customer already has all information
-    if (!state && customer.Name && customer.DOB && customer.DOA) {
-      conversationState.set(dbMobileNo, { step: 'awaiting_name_update_confirmation' });
-      const dobDisplay = new Date(customer.DOB).toLocaleDateString('en-GB').replace(/\//g, '-');
-      const doaDisplay = new Date(customer.DOA).toLocaleDateString('en-GB').replace(/\//g, '-');
-      await sendTextMessage(from, `Welcome back ${customer.Name}!\n\nDate of Birth: ${dobDisplay}\nDate of Anniversary: ${doaDisplay}\n\nWant to update name? Already you have name "${customer.Name}". If you want to change type "Yes" otherwise type "No"`);
+    // 1. QUICK REPLIES PRIORITY
+    const userInputLower = userInput.toLowerCase();
+    const quickReplies = ['shop', 'gents', 'kids', 'ladies'];
+    
+    if (quickReplies.includes(userInputLower)) {
+      if (state) {
+        console.log('Quick reply detected, cancelling ongoing enquiry');
+        conversationState.delete(dbMobileNo);
+      }
+      console.log('Quick reply detected, yielding to campaign bot');
       return res.sendStatus(200);
     }
 
-    // Determine what information is missing
+    const hasCompletedEnquiry = customer.Name && customer.DOB && customer.DOA;
+
+    // 2. ENQUIRY STATE MACHINE & NORMAL MESSAGES
     if (!state) {
-      if (!customer.Name) {
-        conversationState.set(dbMobileNo, { step: 'awaiting_name' });
-        await sendTextMessage(from, 'Welcome! Please enter your name:');
-      } else if (!customer.DOB) {
+      if (userInputLower === 'update name') {
+        if (hasCompletedEnquiry) {
+          conversationState.set(dbMobileNo, { step: 'awaiting_name_update' });
+          await sendTextMessage(from, 'Please enter your new name:');
+        } else {
+          await sendTextMessage(from, 'Please complete your registration first by typing "Hi".');
+        }
+        return res.sendStatus(200);
+      }
+
+      const startTriggers = ['hi', 'hello', 'hey', 'register'];
+      if (startTriggers.includes(userInputLower)) {
+        if (hasCompletedEnquiry) {
+          // Send main menu
+          const dobDisplay = new Date(customer.DOB).toLocaleDateString('en-GB').replace(/\//g, '-');
+          const doaDisplay = new Date(customer.DOA).toLocaleDateString('en-GB').replace(/\//g, '-');
+          await sendTextMessage(from, `Welcome back ${customer.Name}!\n\nDate of Birth: ${dobDisplay}\nDate of Anniversary: ${doaDisplay}\n\nWhat would you like to do?\n\n[🛍 Shop]\n[✏️ Update Name]\n[❓ Help]`);
+        } else {
+          // Determine what information is missing
+          if (!customer.Name) {
+            conversationState.set(dbMobileNo, { step: 'awaiting_name' });
+            await sendTextMessage(from, 'Welcome! Please enter your name:');
+          } else if (!customer.DOB) {
+            conversationState.set(dbMobileNo, { step: 'awaiting_dob' });
+            await sendTextMessage(from, 'Please enter your Date of Birth (DD-MM-YYYY):');
+          } else if (!customer.DOA) {
+            conversationState.set(dbMobileNo, { step: 'awaiting_doa' });
+            await sendTextMessage(from, 'Please enter your Date of Anniversary (DD-MM-YYYY):');
+          }
+        }
+        return res.sendStatus(200);
+      }
+
+      // Normal chat, no state, not a trigger -> do nothing
+      console.log('Normal message, ignoring:', userInput);
+      return res.sendStatus(200);
+
+    } else {
+      // User is in a state
+      if (userInputLower === 'cancel' || userInputLower === 'exit') {
+        conversationState.delete(dbMobileNo);
+        await sendTextMessage(from, 'Action cancelled.');
+        return res.sendStatus(200);
+      }
+
+      if (state.step === 'awaiting_name_update') {
+        await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
+        await sendTextMessage(from, `Your name has been updated successfully to ${userInput}! ✅`);
+        conversationState.delete(dbMobileNo);
+      } else if (state.step === 'awaiting_name') {
+        await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
         conversationState.set(dbMobileNo, { step: 'awaiting_dob' });
         await sendTextMessage(from, 'Please enter your Date of Birth (DD-MM-YYYY):');
-      } else if (!customer.DOA) {
-        conversationState.set(dbMobileNo, { step: 'awaiting_doa' });
-        await sendTextMessage(from, 'Please enter your Date of Anniversary (DD-MM-YYYY):');
-      }
-    } else if (state.step === 'awaiting_name_update_confirmation') {
-      if (userInput.toLowerCase() === 'yes') {
-        conversationState.set(dbMobileNo, { step: 'awaiting_name_update' });
-        await sendTextMessage(from, 'Please enter your new name:');
-      } else {
-        await sendCompletionMessages(from, dbMobileNo);
-      }
-    } else if (state.step === 'awaiting_name_update') {
-      await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
-      await sendCompletionMessages(from, dbMobileNo);
-    } else if (state.step === 'awaiting_name') {
-      await db.execute('UPDATE customer SET Name = ? WHERE MobileNo = ?', [userInput, dbMobileNo]);
-      conversationState.set(dbMobileNo, { step: 'awaiting_dob' });
-      await sendTextMessage(from, 'Please enter your Date of Birth (DD-MM-YYYY):');
-    } else if (state.step === 'awaiting_dob') {
-      const dobRegex = /^\d{2}-\d{2}-\d{4}$/;
-      if (dobRegex.test(userInput)) {
-        const [day, month, year] = userInput.split('-');
-        const dbFormat = `${year}-${month}-${day}`;
-        await db.execute('UPDATE customer SET DOB = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
-        conversationState.set(dbMobileNo, { step: 'awaiting_doa' });
-        await sendTextMessage(from, 'Please enter your Date of Anniversary (DD-MM-YYYY):');
-      } else {
-        await sendTextMessage(from, 'Invalid format! Please enter Date of Birth in DD-MM-YYYY format (e.g., 15-08-1990):');
-      }
-    } else if (state.step === 'awaiting_doa') {
-      const doaRegex = /^\d{2}-\d{2}-\d{4}$/;
-      if (doaRegex.test(userInput)) {
-        const [day, month, year] = userInput.split('-');
-        const dbFormat = `${year}-${month}-${day}`;
-        await db.execute('UPDATE customer SET DOA = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
-        await sendCompletionMessages(from, dbMobileNo);
-      } else {
-        await sendTextMessage(from, 'Invalid format! Please enter Date of Anniversary in DD-MM-YYYY format (e.g., 20-06-2015):');
+      } else if (state.step === 'awaiting_dob') {
+        const dobRegex = /^\d{2}-\d{2}-\d{4}$/;
+        if (dobRegex.test(userInput)) {
+          const [day, month, year] = userInput.split('-');
+          const dbFormat = `${year}-${month}-${day}`;
+          await db.execute('UPDATE customer SET DOB = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
+          conversationState.set(dbMobileNo, { step: 'awaiting_doa' });
+          await sendTextMessage(from, 'Please enter your Date of Anniversary (DD-MM-YYYY):');
+        } else {
+          await sendTextMessage(from, 'Invalid format! Please enter Date of Birth in DD-MM-YYYY format (e.g., 15-08-1990). Type "Cancel" to exit.');
+        }
+      } else if (state.step === 'awaiting_doa') {
+        const doaRegex = /^\d{2}-\d{2}-\d{4}$/;
+        if (doaRegex.test(userInput)) {
+          const [day, month, year] = userInput.split('-');
+          const dbFormat = `${year}-${month}-${day}`;
+          await db.execute('UPDATE customer SET DOA = ? WHERE MobileNo = ?', [dbFormat, dbMobileNo]);
+          await sendCompletionMessages(from, dbMobileNo);
+        } else {
+          await sendTextMessage(from, 'Invalid format! Please enter Date of Anniversary in DD-MM-YYYY format (e.g., 20-06-2015). Type "Cancel" to exit.');
+        }
       }
     }
 
