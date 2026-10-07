@@ -132,9 +132,9 @@ const webhookPost = async (req, res) => {
         processedMessageIds.add(message.id); // keep memory synced
         return res.sendStatus(200);
       }
-      // If it's another DB error, throw it so we don't accidentally process a message
-      // when the database is unreachable or having issues.
-      throw err;
+      // If the table doesn't exist or we lack permissions, log it and gracefully 
+      // fallback to the in-memory check so the bot doesn't completely break.
+      console.error('Database idempotency skipped due to error:', err.message);
     }
 
     processedMessageIds.add(message.id);
