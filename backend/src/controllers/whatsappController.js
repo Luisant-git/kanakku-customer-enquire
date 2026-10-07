@@ -57,6 +57,29 @@ const sendUrlButtonMessage = async (to, bodyText, buttonText, url) => {
   await sendWhatsAppMessage(to, message);
 };
 
+const sendReplyButtonsMessage = async (to, bodyText, buttons) => {
+  const message = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: to,
+    type: 'interactive',
+    interactive: {
+      type: 'button',
+      body: { text: bodyText },
+      action: {
+        buttons: buttons.map(btn => ({
+          type: 'reply',
+          reply: {
+            id: btn.id,
+            title: btn.title
+          }
+        }))
+      }
+    }
+  };
+  await sendWhatsAppMessage(to, message);
+};
+
 const sendCompletionMessages = async (to, dbMobileNo) => {
   try {
     await sendTextMessage(to, 'நன்றி! உங்கள் தகவல் வெற்றிகரமாக சேமிக்கப்பட்டது. 🎉');
@@ -139,24 +162,39 @@ const webhookPost = async (req, res) => {
 
     processedMessageIds.add(message.id);
 
-    // 2. FORWARD A COPY TO WHATSAPP CAMPAIGN DASHBOARD
-    // This sends a copy of the message to your new Whatsapp Multi-Tenant dashboard
-    // It is deliberately NOT awaited (using .catch instead) so it doesn't block the enquiry flow.
-    axios.post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body)
-      .then(response => console.log('✅ Forwarded to Whatsapp Dashboard! Status:', response.status))
-      .catch(err => console.error('❌ Failed to forward to Whatsapp Dashboard:', err.message));
+    // 2. INTERACTIVE BUTTON & FORWARDING LOGIC
+    const isInteractive = message.type === 'interactive';
+    const isText = message.type === 'text';
+    const buttonId = isInteractive ? message.interactive?.button_reply?.id : null;
+    
+    // Internal buttons handled exclusively by the Enquiry bot
+    const isInternalButton = buttonId === 'ENQUIRY_UPDATE_NAME' || buttonId === 'ENQUIRY_HELP';
+
+    // FORWARD A COPY TO WHATSAPP CAMPAIGN DASHBOARD
+    // If it's an internal enquiry button (like Update Name), do NOT forward it.
+    if (!isInternalButton) {
+      axios.post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body)
+        .then(response => console.log('✅ Forwarded to Whatsapp Dashboard! Status:', response.status))
+        .catch(err => console.error('❌ Failed to forward to Whatsapp Dashboard:', err.message));
+    }
 
     console.log('Webhook received for message:', message.id);
-    console.log('Message type:', message.type);
+    console.log('Message type:', message.type, 'Button ID:', buttonId);
 
-    if (message.type !== 'text') {
-      console.log('Not a text message, ignoring');
+    // If it's the ENQUIRY_SHOP button, Campaign bot is already handling it due to the forward above.
+    if (buttonId === 'ENQUIRY_SHOP') {
+      console.log('Shop button tapped, yielding to Campaign bot');
+      return res.sendStatus(200);
+    }
+
+    if (!isText && !isInternalButton) {
+      console.log('Not a text or internal button message, ignoring');
       return res.sendStatus(200);
     }
 
     const from = message.from;
     const mobileNoWithout91 = from.startsWith('91') ? from.substring(2) : from;
-    const userInput = message.text.body.trim();
+    const userInput = isText ? message.text?.body?.trim() || '' : '';
     console.log('From:', from, 'Input:', userInput);
 
     let [rows] = await db.execute(
@@ -202,7 +240,7 @@ const webhookPost = async (req, res) => {
 
     // 2. ENQUIRY STATE MACHINE & NORMAL MESSAGES
     if (!state) {
-      if (userInputLower === 'update name') {
+      if (buttonId === 'ENQUIRY_UPDATE_NAME') {
         if (hasCompletedEnquiry) {
           conversationState.set(dbMobileNo, { step: 'awaiting_name_update' });
           await sendTextMessage(from, 'Please enter your new name:');
@@ -212,13 +250,25 @@ const webhookPost = async (req, res) => {
         return res.sendStatus(200);
       }
 
+      if (buttonId === 'ENQUIRY_HELP') {
+        await sendTextMessage(from, 'Here is how you can use this bot:\n\n1. Type "Hi" to view the main menu.\n2. Tap "🛍 Shop" to browse our collections.\n3. Tap "✏️ Update Name" to change your registered name.');
+        return res.sendStatus(200);
+      }
+
       const startTriggers = ['hi', 'hello', 'hey', 'register'];
       if (startTriggers.includes(userInputLower)) {
         if (hasCompletedEnquiry) {
-          // Send main menu
+          // Send main menu with actual WhatsApp interactive buttons
           const dobDisplay = new Date(customer.DOB).toLocaleDateString('en-GB').replace(/\//g, '-');
           const doaDisplay = new Date(customer.DOA).toLocaleDateString('en-GB').replace(/\//g, '-');
-          await sendTextMessage(from, `Welcome back ${customer.Name}!\n\nDate of Birth: ${dobDisplay}\nDate of Anniversary: ${doaDisplay}\n\nWhat would you like to do?\n\n[🛍 Shop]\n[✏️ Update Name]\n[❓ Help]`);
+          const menuText = `Welcome back ${customer.Name}!\n\nDate of Birth: ${dobDisplay}\nDate of Anniversary: ${doaDisplay}\n\nWhat would you like to do?`;
+          
+          await sendReplyButtonsMessage(from, menuText, [
+            { id: 'ENQUIRY_SHOP', title: '🛍 Shop' },
+            { id: 'ENQUIRY_UPDATE_NAME', title: '✏️ Update Name' },
+            { id: 'ENQUIRY_HELP', title: '❓ Help' }
+          ]);
+
         } else {
           // Determine what information is missing
           if (!customer.Name) {
