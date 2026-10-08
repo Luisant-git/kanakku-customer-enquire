@@ -251,7 +251,7 @@ const webhookPost = async (req, res) => {
       }
 
       if (buttonId === 'ENQUIRY_HELP') {
-        await sendTextMessage(from, 'Here is how you can use this bot:\n\n1. Type "Hi" to view the main menu.\n2. Tap "🛍 Shop" to browse our collections.\n3. Tap "✏️ Update Name" to change your registered name.');
+        await sendTextMessage(from, 'Here is how you can use this bot:\n\n1. Type "Hi" to view the main menu.\n2. Tap "✏️ Update Name" to change your registered name.\n3. Type "Exit" or "Cancel" to cancel the current action.');
         return res.sendStatus(200);
       }
 
@@ -264,7 +264,7 @@ const webhookPost = async (req, res) => {
           const menuText = `Welcome back ${customer.Name}!\n\nDate of Birth: ${dobDisplay}\nDate of Anniversary: ${doaDisplay}\n\nWhat would you like to do?`;
           
           await sendReplyButtonsMessage(from, menuText, [
-            { id: 'ENQUIRY_SHOP', title: '🛍 Shop' },
+            // { id: 'ENQUIRY_SHOP', title: '🛍 Shop' },
             { id: 'ENQUIRY_UPDATE_NAME', title: '✏️ Update Name' },
             { id: 'ENQUIRY_HELP', title: '❓ Help' }
           ]);
