@@ -130,6 +130,15 @@ const webhookPost = async (req, res) => {
     const change = entry?.changes?.[0];
     const message = change?.value?.messages?.[0];
 
+
+    // ALWAYS FORWARD ALL WEBHOOKS TO WHATSAPP DASHBOARD (so it tracks Delivered/Read statuses + messages)
+    const isInternalButton = message?.type === 'interactive' && (message.interactive?.button_reply?.id === 'ENQUIRY_UPDATE_NAME' || message.interactive?.button_reply?.id === 'ENQUIRY_HELP');
+    if (!isInternalButton) {
+      require('axios').post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body)
+        .then(response => console.log('→ Forwarded to Whatsapp Dashboard! Status:', response.status))
+        .catch(err => console.error('❌ Failed to forward to Whatsapp Dashboard:', err.message));
+    }
+
     if (!message) {
       console.log('No message found');
       return res.sendStatus(200);
