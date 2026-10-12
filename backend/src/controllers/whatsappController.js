@@ -132,8 +132,8 @@ const webhookPost = async (req, res) => {
 
 
     // ALWAYS FORWARD ALL WEBHOOKS TO WHATSAPP DASHBOARD (so it tracks Delivered/Read statuses + messages)
-    const isInternalButton = message?.type === 'interactive' && (message.interactive?.button_reply?.id === 'ENQUIRY_UPDATE_NAME' || message.interactive?.button_reply?.id === 'ENQUIRY_HELP');
-    if (!isInternalButton) {
+    const isForwardInternalButton = message?.type === 'interactive' && (message.interactive?.button_reply?.id === 'ENQUIRY_UPDATE_NAME' || message.interactive?.button_reply?.id === 'ENQUIRY_HELP');
+    if (!isForwardInternalButton) {
       require('axios').post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body)
         .then(response => console.log('→ Forwarded to Whatsapp Dashboard! Status:', response.status))
         .catch(err => console.error('❌ Failed to forward to Whatsapp Dashboard:', err.message));
@@ -173,14 +173,6 @@ const webhookPost = async (req, res) => {
     
     // Internal buttons handled exclusively by the Enquiry bot
     const isInternalButton = buttonId === 'ENQUIRY_UPDATE_NAME' || buttonId === 'ENQUIRY_HELP';
-
-    // FORWARD A COPY TO WHATSAPP CAMPAIGN DASHBOARD
-    // If it's an internal enquiry button (like Update Name), do NOT forward it.
-    if (!isInternalButton) {
-      axios.post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body)
-        .then(response => console.log('✅ Forwarded to Whatsapp Dashboard! Status:', response.status))
-        .catch(err => console.error('❌ Failed to forward to Whatsapp Dashboard:', err.message));
-    }
 
     console.log('Webhook received for message:', message.id);
     console.log('Message type:', message.type, 'Button ID:', buttonId);
