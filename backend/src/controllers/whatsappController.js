@@ -133,10 +133,11 @@ const webhookPost = async (req, res) => {
 
     // ALWAYS FORWARD ALL WEBHOOKS TO WHATSAPP DASHBOARD (so it tracks Delivered/Read statuses + messages)
     const isForwardInternalButton = message?.type === 'interactive' && (message.interactive?.button_reply?.id === 'ENQUIRY_UPDATE_NAME' || message.interactive?.button_reply?.id === 'ENQUIRY_HELP');
-    if (!isForwardInternalButton) {
+    const isFromDashboard = req.headers['x-forwarded-from'] === 'whatsapp-dashboard';
+    if (!isForwardInternalButton && !isFromDashboard) {
       const axios = require('axios');
       // 1. Direct local port on the same server (instant, bypasses Nginx 502 Bad Gateway)
-      axios.post('http://localhost:3010/whatsapp/webhook', body, { timeout: 8000 })
+      axios.post('http://localhost:3010/whatsapp/webhook', body, { timeout: 8000, headers: { 'Content-Type': 'application/json', 'x-forwarded-from': 'enquiry-bot' } })
         .then(res => console.log('→ Forwarded to Local/Internal WhatsApp Port 3010! Status:', res.status))
         .catch(() => {
           // 2. If localhost not reachable, forward via public domain with retry
