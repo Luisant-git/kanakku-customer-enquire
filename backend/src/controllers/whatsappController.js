@@ -134,12 +134,23 @@ const webhookPost = async (req, res) => {
     // ALWAYS FORWARD ALL WEBHOOKS TO WHATSAPP DASHBOARD (so it tracks Delivered/Read statuses + messages)
     const isForwardInternalButton = message?.type === 'interactive' && (message.interactive?.button_reply?.id === 'ENQUIRY_UPDATE_NAME' || message.interactive?.button_reply?.id === 'ENQUIRY_HELP');
     if (!isForwardInternalButton) {
-      require('axios').post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body)
-        .then(response => console.log('→ Forwarded to Production Dashboard! Status:', response.status))
-        .catch(err => console.error('❌ Failed to forward to Production Dashboard:', err.message));
-      require('axios').post('http://localhost:3010/whatsapp/webhook', body)
-        .then(response => console.log('→ Forwarded to Local Dashboard! Status:', response.status))
-        .catch(() => {});
+      const axios = require('axios');
+      // 1. Direct local port on the same server (instant, bypasses Nginx 502 Bad Gateway)
+      axios.post('http://localhost:3010/whatsapp/webhook', body, { timeout: 8000 })
+        .then(res => console.log('→ Forwarded to Local/Internal WhatsApp Port 3010! Status:', res.status))
+        .catch(() => {
+          // 2. If localhost not reachable, forward via public domain with retry
+          axios.post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body, { timeout: 10000 })
+            .then(res => console.log('→ Forwarded to Production WhatsApp Dashboard! Status:', res.status))
+            .catch(err => {
+              console.error('❌ First attempt failed, retrying forward:', err.message);
+              setTimeout(() => {
+                axios.post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body, { timeout: 10000 })
+                  .then(r => console.log('→ Retry forwarded to WhatsApp Dashboard! Status:', r.status))
+                  .catch(e => console.error('❌ Retry failed to forward:', e.message));
+              }, 2000);
+            });
+        });
     }
 
     if (!message) {
