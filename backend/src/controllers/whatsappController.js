@@ -135,8 +135,11 @@ const webhookPost = async (req, res) => {
     const isForwardInternalButton = message?.type === 'interactive' && (message.interactive?.button_reply?.id === 'ENQUIRY_UPDATE_NAME' || message.interactive?.button_reply?.id === 'ENQUIRY_HELP');
     if (!isForwardInternalButton) {
       require('axios').post('https://whatsapp.api.luisant.cloud/whatsapp/webhook', body)
-        .then(response => console.log('→ Forwarded to Whatsapp Dashboard! Status:', response.status))
-        .catch(err => console.error('❌ Failed to forward to Whatsapp Dashboard:', err.message));
+        .then(response => console.log('→ Forwarded to Production Dashboard! Status:', response.status))
+        .catch(err => console.error('❌ Failed to forward to Production Dashboard:', err.message));
+      require('axios').post('http://localhost:3010/whatsapp/webhook', body)
+        .then(response => console.log('→ Forwarded to Local Dashboard! Status:', response.status))
+        .catch(() => {});
     }
 
     if (!message) {
